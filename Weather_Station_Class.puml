@@ -1,0 +1,45 @@
+@startuml
+'https://plantuml.com/class-diagram
+
+scale 1.5
+title Weather Station Data
+class Weather_Data {
+    -temperature : integer
+    -pressure : float
+    -humidity : float
+    -rain : integer
+    -wind: integer
+
+    +void receive_data()
+    -Data process_data()
+    +Data get_data()
+}
+
+class Sensor_Node {
+    +sensor_id : integer
+    -int read_temperature()
+    -float read_pressure()
+    -float read_humidity()
+    -int read_rain()
+    -int read_wind()
+    +void send_data()
+}
+Sensor_Node --> Weather_Data
+
+class Gateway_Node {
+    +gateway_id : integer
+    -ssid : string
+    -password : string
+    +name : string
+    +topic : string
+    +ip_addr : string
+
+    -void setup_wifi()
+    +void client_connect()
+    +void setup()
+    +void receive_data()
+    +void send_data(location)
+}
+Gateway_Node "1" o-- "many" Sensor_Node
+
+@enduml

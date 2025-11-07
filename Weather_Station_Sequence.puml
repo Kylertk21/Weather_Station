@@ -1,0 +1,36 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+participant Sensor_Node
+participant Gateway_Node
+participant Radio
+participant Broker
+participant Server
+participant Database
+participant UI
+actor User
+
+title Weather Station Sequence
+scale 1
+
+Sensor_Node -> Gateway_Node : [SPI] Weather_Data
+Gateway_Node -> Radio : [RAW] Weather_Data
+Gateway_Node --> Broker : Connect <id>
+Gateway_Node -> Broker : [TOPIC] Weather_Data
+Broker --> Server : Connect
+Broker -> Server : /id/<data>
+Server -> Database : [UPSERT] Weather Data
+
+
+User --> UI : request current data
+Server -> UI : [GET] weather/<data>
+User --> UI : request data from <date>
+
+UI -> Server : Data Request <date>
+Server -> Database : [QUERY] Weather Data by <date>
+Database -> Server : [RETURN] Weather_Data<date>
+Server -> UI : Weather_Data<date>
+
+
+
+@enduml

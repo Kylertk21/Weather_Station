@@ -1,25 +1,46 @@
 @startuml
 'https://plantuml.com/state-diagram
 
-scale 1.5
+scale 1
 [*] --> power
 state Station {
     state power <<inputPin>>
-    state request <<inputPin>>
-    power --> Sensing
-    request --> Sensing
-    Sensing : + On Power / Request
-    Sensing : poll temperature
-    Sensing : poll pressure
-    Sensing : poll humidity
-    Sensing : poll rain
+    state StationInput <<inputPin>>
+    power --> SensorNode
+    StationInput --> SensorNode
+    SensorNode : + On Power / Request
+    SensorNode : poll temperature
+    SensorNode : poll pressure
+    SensorNode : poll humidity
+    SensorNode : poll rain
 
-    Sensing -> Relaying : Poll Done/ [queue->isEmpty]
-    Relaying : + On Queue Insert
-    Relaying : connect to broker
-    Relaying : pick oldest data from queue
-    Relaying : publish data to topic
+    SensorNode -> GatewayNode : Poll Done/ [queue->isEmpty]
+    GatewayNode : + On Queue Insert
+    GatewayNode : connect to broker
+    GatewayNode : pick oldest data from queue
+    GatewayNode : publish data to topic
+
+    GatewayNode --> StationOutput <<exitPoint>>
 }
+
+StationOutput ---> BrokerInput : connect
+StationOutput ---> BrokerInput : data
+state Broker {
+    state BrokerInput <<inputPin>>
+    state Responses
+    state Requests
+
+    Requests -> BrokerOutput <<exitPoint>>
+    Responses -> BrokerOutput
+}
+BrokerOutput -> StationInput : /request
+
+state Server
+Server ---> BrokerInput : Request
+BrokerOutput -> Server : [POST] Response
+
+
+
 
 
 @enduml

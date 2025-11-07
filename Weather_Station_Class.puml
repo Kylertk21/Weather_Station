@@ -24,7 +24,7 @@ class Sensor_Node {
     -int read_wind()
     +void send_data()
 }
-Sensor_Node --> Weather_Data
+Sensor_Node -> Weather_Data
 
 class Gateway_Node {
     +gateway_id : integer

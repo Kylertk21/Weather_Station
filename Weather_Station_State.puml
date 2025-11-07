@@ -1,0 +1,25 @@
+@startuml
+'https://plantuml.com/state-diagram
+
+scale 1.5
+[*] --> power
+state Station {
+    state power <<inputPin>>
+    state request <<inputPin>>
+    power --> Sensing
+    request --> Sensing
+    Sensing : + On Power / Request
+    Sensing : poll temperature
+    Sensing : poll pressure
+    Sensing : poll humidity
+    Sensing : poll rain
+
+    Sensing -> Relaying : Poll Done/ [queue->isEmpty]
+    Relaying : + On Queue Insert
+    Relaying : connect to broker
+    Relaying : pick oldest data from queue
+    Relaying : publish data to topic
+}
+
+
+@enduml

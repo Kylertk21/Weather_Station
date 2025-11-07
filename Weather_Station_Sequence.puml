@@ -3,7 +3,7 @@
 
 participant Sensor_Node
 participant Gateway_Node
-participant Radio
+participant Topic
 participant Broker
 participant Server
 participant Database
@@ -13,22 +13,33 @@ actor User
 title Weather Station Sequence
 scale 1
 
-Sensor_Node -> Gateway_Node : [SPI] Weather_Data
-Gateway_Node -> Radio : [RAW] Weather_Data
 Gateway_Node --> Broker : Connect <id>
-Gateway_Node -> Broker : [TOPIC] Weather_Data
-Broker --> Server : Connect
-Broker -> Server : /id/<data>
-Server -> Database : [UPSERT] Weather Data
+Server --> Broker : Connect <id>
+Gateway_Node -> Topic : Send from oldest in queue
+Server -> Topic : Retrieve Most Recent Data
+Topic -> Server : [POST] /responses/<data>
 
+Server -> UI : [GET] Weather_Data
+Server -> Database : [UPSERT] Weather_Data
 
-User --> UI : request current data
-Server -> UI : [GET] weather/<data>
-User --> UI : request data from <date>
+User --> UI : Update Weather Data
+UI -> Server : Update Request
+Server -> Broker : Update Request
+
+Broker -> Topic : Publish /requests/<data>
+Gateway_Node -> Topic : Check for requests
+Gateway_Node -> Sensor_Node : Request Poll
+Sensor_Node -> Gateway_Node : Weather_Data
+Gateway_Node -> Topic : Publish /responses/<data>
+Topic -> Server : [POST] /responses/<data>
+
+Server -> UI : [GET] Weather_Data
+Server -> Database : [UPSERT] Weather_Data
+User --> UI : Request Weather Data by <date>
 
 UI -> Server : Data Request <date>
-Server -> Database : [QUERY] Weather Data by <date>
-Database -> Server : [RETURN] Weather_Data<date>
+Server -> Database : [QUERY] Weather_Data by <date>
+Database -> Server : Weather_Data<date>
 Server -> UI : Weather_Data<date>
 
 

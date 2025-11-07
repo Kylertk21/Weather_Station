@@ -1,0 +1,26 @@
+### Function Breakdown ###
+
+Receive Data:
+    Gateway node sends data to broker (libre)
+    Broker routes by topic
+    server subscribes to each topic
+    server stores / processes data based on topic
+    frontend
+
+Process Data:
+    Normalize data (fuzzy or real)
+    Place into data structures (hash map)
+    Store data in database
+
+Routes:
+    POST:
+       Temperature
+       Pressure
+       Humidity
+       Rain
+       Wind
+
+    GET:
+       Index
+       Prediction
+

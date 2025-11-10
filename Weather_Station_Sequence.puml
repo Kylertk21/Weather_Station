@@ -17,7 +17,7 @@ Gateway_Node --> Broker : Connect <id>
 Server --> Broker : Connect <id>
 Gateway_Node -> Topic : Send from oldest in queue
 Server -> Topic : Retrieve Most Recent Data
-Topic -> Server : [POST] /responses/<data>
+Broker -> Server : [POST] /responses/<data>
 
 Server -> UI : [GET] Weather_Data
 Server -> Database : [UPSERT] Weather_Data

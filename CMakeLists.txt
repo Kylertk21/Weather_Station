@@ -4,21 +4,34 @@ project(Weather_Station_Dashboard)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# --- Crow includes ---
+include_directories(external/Crow/include)
+include_directories(external/asio/asio/include)
+
+# --- Main executable ---
+add_executable(Weather_Station_Dashboard src/main.cpp)
+
+# --- GoogleTest via FetchContent ---
 include(FetchContent)
 FetchContent_Declare(
         googletest
-        URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+        URL https://github.com/google/googletest/archive/refs/heads/main.zip
 )
-
+# Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-# Include Crow headers
-include_directories(external/Crow/include)
-include_directories(external/Crow/include external/asio/asio/include)
-include_directories(external/gtest/googletest/include)
+# --- Testing ---
+enable_testing()
 
-# Add your sources
-add_executable(Weather_Station_Dashboard
-        src/main.cpp
+add_executable(runTests tests/tests.cpp)
+
+target_link_libraries(runTests
+        PRIVATE
+        GTest::gtest
+        GTest::gtest_main
+        pthread
 )
+
+include(GoogleTest)
+gtest_discover_tests(runTests)

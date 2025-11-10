@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y cmake g++ make git libssl-dev curl \
 
 WORKDIR /app
 
-COPY . .
+COPY . /app
 
 RUN mkdir -p external && \
     git clone --depth=1 https://github.com/CrowCpp/Crow.git external/Crow
@@ -17,7 +17,7 @@ RUN mkdir -p external/gtest && \
 RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
     cmake --build build -- -j$(nproc)
 
-FROM ubuntu:22.04
+FROM ubuntu:22.04 AS app
 
 RUN apt-get update && apt-get install -y \
     git cmake build-essential libssl-dev && \
@@ -55,8 +55,16 @@ RUN git clone https://github.com/eclipse/paho.mqtt.cpp.git /tmp/paho-cpp && \
 WORKDIR /app
 
 COPY --from=builder /app/build/Weather_Station_Dashboard .
+COPY --from=builder /app/src/templates ./templates
 
 EXPOSE 18080
 
 CMD ["./Weather_Station_Dashboard"]
-ENTRYPOINT ["top", "-b"]
+
+
+# --- tests ---
+FROM builder AS tests
+WORKDIR /app
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON && \
+    cmake --build build --target runTests -- -j$(nproc)
+CMD ["./build/runTests"]

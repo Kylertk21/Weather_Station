@@ -1,14 +1,24 @@
 cmake_minimum_required(VERSION 3.10)
 project(Weather_Station_Dashboard)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find Crow (if installed system-wide)
-find_package(Crow REQUIRED)
+include(FetchContent)
+FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+)
 
-# Define the executable — this is your target name
-add_executable(Weather_Station_Dashboard src/main.cpp)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
 
-# Link Crow to the SAME target name
-target_link_libraries(Weather_Station_Dashboard PRIVATE /usr/include)
+# Include Crow headers
+include_directories(external/Crow/include)
+include_directories(external/Crow/include external/asio/asio/include)
+include_directories(external/gtest/googletest/include)
+
+# Add your sources
+add_executable(Weather_Station_Dashboard
+        src/main.cpp
+)

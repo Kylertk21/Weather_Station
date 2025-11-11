@@ -23,10 +23,18 @@ services:
       dockerfile: Dockerfile
       target: tests
     container_name: weather_station_tests
-    command: ["/bin/bash", "-c", "cmake -S . -B build && cmake --build build --target runTests && ./build/runTests --gtest_color=yes"]
+    command: > 
+      bash -c "
+        if [ ! -d external/Crow ]; then
+          mkdir -p external && git clone --depth=1 https://github.com/CrowCpp/Crow.git external/Crow;
+        fi && 
+        rm -rf build && 
+        cmake -S . -B build -DBUILD_TESTS=ON &&
+        cmake --build build --target runTests -- -j$(nproc) &&
+        ./build/runTests --gtest_color=yes 
+      "
     volumes:
       - .:/app
-      - ./build:/app/build
     stdin_open: true
     tty: true
 

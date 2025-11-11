@@ -4,6 +4,8 @@ project(Weather_Station_Dashboard)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(BUILD_TESTS "build test suite" OFF)
+
 # --- Crow includes ---
 include_directories(${CMAKE_SOURCE_DIR}/external/Crow/include)
 
@@ -28,6 +30,7 @@ if(BUILD_TESTS)
     add_executable(runTests
             tests/tests.cpp
             src/weather_data.h
+            tests/tests.cpp
     )
     target_include_directories(runTests PRIVATE ${CMAKE_SOURCE_DIR}/external/Crow/include)
     target_link_libraries(runTests PRIVATE GTest::gtest GTest::gtest_main pthread)

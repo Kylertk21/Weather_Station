@@ -17,7 +17,7 @@ RUN mkdir -p external/gtest && \
 RUN rm -rf build && \
     mkdir build && \
     cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
-    cmake --build build -- -j$(nproc)
+    cmake --build build --target Weather_Station_Dashboard -- -j$(nproc)
 
 
 FROM ubuntu:22.04 AS app
@@ -74,7 +74,7 @@ COPY src/templates ./src/templates
 
 # Rebuild with test flag enabled
 RUN rm -rf build && \
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON && \
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON && \
     cmake --build build --target runTests -- -j$(nproc)
 
 CMD ["./build/runTests"]

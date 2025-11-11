@@ -14,8 +14,11 @@ RUN mkdir -p external && \
 RUN mkdir -p external/gtest && \
     git clone --depth=1 https://github.com/google/googletest.git external/gtest
 
-RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
+RUN rm -rf build && \
+    mkdir build && \
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
     cmake --build build -- -j$(nproc)
+
 
 FROM ubuntu:22.04 AS app
 
@@ -65,6 +68,13 @@ CMD ["./Weather_Station_Dashboard"]
 # --- tests ---
 FROM builder AS tests
 WORKDIR /app
-RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON && \
+
+# Copy templates for Crow tests
+COPY src/templates ./src/templates
+
+# Rebuild with test flag enabled
+RUN rm -rf build && \
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON && \
     cmake --build build --target runTests -- -j$(nproc)
+
 CMD ["./build/runTests"]

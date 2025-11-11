@@ -9,6 +9,7 @@ class Weather_Data {
     -humidity : float
     -rain : integer
     -wind: integer
+    +topic : string
 
     +void receive_data()
     -Data process_data()
@@ -31,7 +32,6 @@ class Gateway_Node {
     -ssid : string
     -password : string
     +name : string
-    +topic : string
     +ip_addr : string
 
     -void setup_wifi()

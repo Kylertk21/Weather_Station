@@ -33,7 +33,14 @@ if(BUILD_TESTS)
             tests/tests.cpp
     )
     target_include_directories(runTests PRIVATE ${CMAKE_SOURCE_DIR}/external/Crow/include)
-    target_link_libraries(runTests PRIVATE GTest::gtest GTest::gtest_main pthread)
+    target_link_libraries(runTests
+            PRIVATE
+            GTest::gtest
+            GTest::gtest_main
+            GTest::gmock
+            GTest::gmock_main
+            pthread
+    )
     include(GoogleTest)
     gtest_discover_tests(runTests)
 endif()

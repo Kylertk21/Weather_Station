@@ -5,11 +5,7 @@ RUN apt-get update && apt-get install -y cmake g++ make git libssl-dev curl \
     libasio-dev
 
 WORKDIR /app
-
 COPY . /app
-
-RUN mkdir -p external && \
-    git clone --depth=1 https://github.com/CrowCpp/Crow.git external/Crow
 
 RUN mkdir -p external/gtest && \
     git clone --depth=1 https://github.com/google/googletest.git external/gtest
@@ -23,7 +19,7 @@ RUN rm -rf build && \
 FROM ubuntu:22.04 AS app
 
 RUN apt-get update && apt-get install -y \
-    git cmake build-essential libssl-dev && \
+    git cmake build-essential libssl-dev libasio-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # 1. Build and install Paho MQTT C (with async and CMake package export)
@@ -68,9 +64,6 @@ CMD ["./Weather_Station_Dashboard"]
 # --- tests ---
 FROM builder AS tests
 WORKDIR /app
-
-# Copy templates for Crow tests
-COPY src/templates ./src/templates
 
 # Rebuild with test flag enabled
 RUN rm -rf build && \

@@ -10,12 +10,17 @@ services:
     ports:
       - "18080:18080"
     volumes:
-      - ./src:/app/src
-      - ./src/templates:/app/templates
+      - .:/app
     restart: unless-stopped
     stdin_open: true
     tty: true
-    command: bash
+    command: bash -c "
+              cmake -S . -B build && cmake --build build --target 
+              Weather_Station_Dashboard && ./build/Weather_Station_Dashboard
+            "
+    deploy:
+      restart_policy:
+        condition: any
 
   tests:
     build:
@@ -34,7 +39,9 @@ services:
         ./build/runTests --gtest_color=yes 
       "
     volumes:
-      - .:/app
+      - ./src:/app/src
+      - ./src/templates:/app/templates
+
     stdin_open: true
     tty: true
 

@@ -16,22 +16,21 @@ scale 1
 Gateway_Node --> Broker : Connect <id>
 Server --> Broker : Connect <id>
 Gateway_Node -> Topic : Send from oldest in queue
-Server -> Topic : Retrieve Most Recent Data
-Broker -> Server : [POST] /responses/<data>
+Server -> Topic : Subscribe to /device/responses
+Topic -> Server : Retrieve oldest in queue
 
 Server -> UI : [GET] Weather_Data
 Server -> Database : [UPSERT] Weather_Data
 
 User --> UI : Update Weather Data
 UI -> Server : Update Request
-Server -> Broker : Update Request
 
-Broker -> Topic : Publish /requests/<data>
+Server -> Topic : Publish /device/requests
 Gateway_Node -> Topic : Check for requests
 Gateway_Node -> Sensor_Node : Request Poll
 Sensor_Node -> Gateway_Node : Weather_Data
 Gateway_Node -> Topic : Publish /responses/<data>
-Topic -> Server : [POST] /responses/<data>
+Topic -> Server : Retrieve oldest in queue
 
 Server -> UI : [GET] Weather_Data
 Server -> Database : [UPSERT] Weather_Data

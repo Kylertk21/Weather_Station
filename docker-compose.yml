@@ -29,7 +29,7 @@ services:
       target: tests
     container_name: weather_station_tests
     command: > 
-      bash -c "
+      bash -ce "
         if [ ! -d external/Crow ]; then
           mkdir -p external && git clone --depth=1 https://github.com/CrowCpp/Crow.git external/Crow;
         fi && 

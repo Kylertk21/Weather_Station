@@ -38,7 +38,7 @@ services:
         rm -rf build && 
         cmake -S . -B build -DBUILD_TESTS=ON &&
         cmake --build build --target runTests -- -j$(nproc) &&
-        ./build/runTests --gtest_color=yes 
+        ./build/runTests --gtest_color=yes --gtest_brief=0
       "
     volumes:
       - .:/app

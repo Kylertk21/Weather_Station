@@ -44,6 +44,10 @@ public:
         return wind;
     }
 
+    static bool isJson(string json) {
+        return true;
+    }
+
 private:
     string topic;
     int temperature = 0;

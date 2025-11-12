@@ -15,9 +15,11 @@ services:
     stdin_open: true
     tty: true
     command: bash -c "
-              cmake -S . -B build && cmake --build build --target 
-              Weather_Station_Dashboard && ./build/Weather_Station_Dashboard
-            "
+      rm -rf build_app &&
+      cmake -S . -B build_app &&
+      cmake --build build_app --target Weather_Station_Dashboard &&
+      ./build_app/Weather_Station_Dashboard
+      "
     deploy:
       restart_policy:
         condition: any

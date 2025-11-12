@@ -64,7 +64,7 @@ protected:
 
     void SetUp() override {
         CROW_ROUTE(app, "/")([]() {
-            crow::mustache::set_base("/app/templates");
+            crow::mustache::set_base("/app/src/templates");
             auto page = crow::mustache::load_text("index.html");
             return page;
         });

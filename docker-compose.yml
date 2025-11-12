@@ -39,8 +39,7 @@ services:
         ./build/runTests --gtest_color=yes 
       "
     volumes:
-      - ./src:/app/src
-      - ./src/templates:/app/templates
+      - .:/app
 
     stdin_open: true
     tty: true

@@ -48,6 +48,10 @@ public:
         return true;
     }
 
+    static bool isPopulated(string s) {
+        return true;
+    }
+
 private:
     string topic;
     int temperature = 0;

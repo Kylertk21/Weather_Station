@@ -2,7 +2,7 @@ FROM ubuntu:22.04 AS builder
 LABEL authors="kyler"
 
 RUN apt-get update && apt-get install -y cmake g++ make git libssl-dev curl \
-    libasio-dev
+    libasio-dev nlohmann-json3-dev
 
 WORKDIR /app
 COPY . /app
@@ -19,7 +19,7 @@ RUN rm -rf build && \
 FROM ubuntu:22.04 AS app
 
 RUN apt-get update && apt-get install -y \
-    git cmake build-essential libssl-dev libasio-dev && \
+    git cmake build-essential libssl-dev libasio-dev nlohmann-json3-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # 1. Build and install Paho MQTT C (with async and CMake package export)

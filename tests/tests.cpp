@@ -3,6 +3,7 @@
 //
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <nlohmann/json.hpp>
 #include "../src/weather_data.h"
 #include "../src/routes.h"
 
@@ -64,11 +65,11 @@ TEST_F(WeatherDataTest, TestSetDataEMPTY) {
         .WillOnce(testing::Return(""));
 
     const std::string json = mock.getJson();
-    EXPECT_FALSE(data.isJson(json));
+    EXPECT_FALSE(data.isPopulated(json));
 }
 
 TEST_F(WeatherDataTest, TestDataInJSONFormat) { // Data in JSON format
-    GTEST_SKIP() << "Not implemented...";
+
 }
 
 TEST_F(WeatherDataTest, TestDataNOTInJSONFormat) { // Data NOT in JSON format

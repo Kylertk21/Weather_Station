@@ -35,6 +35,7 @@ protected:
         ON_CALL(mock, getJson())
             .WillByDefault(testing::Return(
                 R"({
+                        "topic":"device1/responses",
                         "temp":72,
                         "pressure":1013.2,
                         "humidity":45.5,
@@ -43,46 +44,73 @@ protected:
                                     })"));
     }
 
-    void TearDown() override {
+};
 
+class EmptyWeatherDataTest : public testing::Test {
+protected:
+    Weather_Data emptyData;
+    MockJsonProvider mock;
+
+    void SetUp() override {
+        emptyData.set_data(
+            "",
+            0,
+            0.0,
+            0.0,
+            0.0,
+            0.0 );
+        ON_CALL(mock, getJson())
+            .WillByDefault(testing::Return(
+                R"({})"));
     }
-
 };
 
 TEST_F(WeatherDataTest, TestSetData) { // Test data is set in class structure
 
+    EXPECT_EQ(data.get_topic(), "device1/responses");
     EXPECT_EQ(data.get_temperature(), 72);
     EXPECT_FLOAT_EQ(data.get_pressure(), 1013.2);
     EXPECT_FLOAT_EQ(data.get_humidity(), 45.5);
     EXPECT_FLOAT_EQ(data.get_rain(), 0.1);
     EXPECT_FLOAT_EQ(data.get_wind(), 5.4);
 
+    const std::string json = mock.getJson();
+    EXPECT_TRUE(data.validateData(json));
+
 }
 
-TEST_F(WeatherDataTest, TestSetDataEMPTY) {
+TEST_F(EmptyWeatherDataTest, TestSetDataEMPTY) { // Test data set empty
 
-    EXPECT_CALL(mock, getJson())
-        .WillOnce(testing::Return(""));
+    EXPECT_EQ(emptyData.get_topic(), "");
+    EXPECT_EQ(emptyData.get_temperature(), 0);
+    EXPECT_FLOAT_EQ(emptyData.get_pressure(), 0.0);
+    EXPECT_FLOAT_EQ(emptyData.get_humidity(), 0.0);
+    EXPECT_FLOAT_EQ(emptyData.get_rain(), 0.0);
+    EXPECT_FLOAT_EQ(emptyData.get_wind(), 0.0);
 
     const std::string json = mock.getJson();
-    EXPECT_FALSE(data.isPopulated(json));
+    EXPECT_FALSE(emptyData.validateData(json));
 }
 
 TEST_F(WeatherDataTest, TestIsJsonFunction) { // Data in JSON format
-    EXPECT_TRUE(data.isJson(mock.getJson()));
+    EXPECT_TRUE(data.validateData(mock.getJson()));
 }
 
 TEST_F(WeatherDataTest, TestDataNOTInJSONFormat) { // Test fail when not in JSON
     const std::string notJson = "This is not JSON";
-    EXPECT_FALSE(data.isJson(notJson));
+    EXPECT_FALSE(data.validateData(notJson));
 }
 
-TEST(BrokerTest, TestReadData) { // Test data can be read from /device/responses
-    GTEST_SKIP() << "Not implemented...";
+TEST_F(WeatherDataTest, TestReadData) { // Test data can be read from /device/responses
+    const string returned = data.readData();
+    const bool result = data.validateData(returned);
+    EXPECT_TRUE(result);
 }
 
-TEST(BrokerTest, TestReadDataFAIL) { // Test read data FAIL
-    GTEST_SKIP() << "Not implemented...";
+TEST_F(EmptyWeatherDataTest, TestReadDataFAIL) {   // Test read data FAIL
+    const string returned = emptyData.readData();
+    const bool result = emptyData.validateData(returned);
+    EXPECT_FALSE(result);
 }
 
 TEST(BrokerTest, TestSendData) { // Test data can be sent to /device/requests

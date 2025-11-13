@@ -1,6 +1,7 @@
 //
 // Created by kylerk on 11/10/2025.
 //
+#pragma once
 #include <unordered_map>
 #include <string>
 #include <utility>
@@ -11,6 +12,7 @@ using namespace std;
 
 class Weather_Data {
 public:
+    bool isPopulated;
     Weather_Data() = default;
     void receive_data();
     void set_data(const string& top, const int temp, const float press,
@@ -52,13 +54,15 @@ public:
         return wind;
     }
 
-    static bool isJson(string json) {
-        return true;
+    static string readData() {
+        return "";
     }
 
-    static bool isPopulated(string s) {
-        return true;
+    bool validateData(string data) {
+        this->isPopulated = false;
+        return isPopulated;
     }
+
 
 private:
     string topic;

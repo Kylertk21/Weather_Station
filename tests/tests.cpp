@@ -18,6 +18,9 @@ public:
     MOCK_METHOD(std::string, getJson, (), (const, override));
 };
 
+// ========================================================================
+// BASIC DATA TESTS
+// ========================================================================
 
 class WeatherDataTest : public testing::Test {
 protected:
@@ -113,6 +116,17 @@ TEST_F(EmptyWeatherDataTest, TestReadDataFAIL) {   // Test read data FAIL
     EXPECT_FALSE(result);
 }
 
+// ========================================================================================
+// INTEGRATION TESTS
+// ========================================================================================
+
+class MQTT_Test_Client {
+private:
+    struct mosquitto *client = nullptr;
+    std::string broker_host;
+    int broker_port = 0;
+    std::atomic<bool>
+};
 
 
 TEST(BrokerTest, TestSendData) { // Test data can be sent to /device/requests
@@ -123,6 +137,9 @@ TEST(BrokerTest, TestSendDataFAIL) { // Test send data FAIL
     GTEST_SKIP() << "Not implemented";
 }
 
+// =========================================================================================
+// SERVER TESTS
+// =========================================================================================
 
 class CrowAppTest : public testing::Test {
 protected:
@@ -179,6 +196,12 @@ TEST_F(CrowAppTest, TestDataRequestFromTimePeriodSent) { // Test request for dat
 TEST_F(CrowAppTest, TestServerQueriesDataBase) { // Test server queries database for data from time period
     GTEST_SKIP() << "Not implemented...";
 }
+
+// ======================================================================================
+// DEATH TESTS
+// ======================================================================================
+
+// TODO: Death Tests
 
 
 

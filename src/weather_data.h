@@ -21,6 +21,7 @@ public:
         rain = 0.0;
         wind = 0.0;
         isPopulated = false;
+        isConnected = false;
     }
 
     void receive_data();
@@ -68,6 +69,10 @@ public:
         return "";
     }
 
+    static void connectBroker() {
+
+    }
+
     bool validateData(string data) {
         this->isPopulated = false;
         return isPopulated;
@@ -81,6 +86,7 @@ private:
     float rain;
     float wind;
     bool isPopulated;
+    bool isConnected;
 
     std::unordered_map<string, string> dataMap;
 

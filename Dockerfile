@@ -1,8 +1,19 @@
 FROM ubuntu:22.04 AS builder
 LABEL authors="kyler"
 
-RUN apt-get update && apt-get install -y cmake g++ make git libssl-dev curl \
-    libasio-dev nlohmann-json3-dev
+RUN apt-get update && apt-get install -y  \
+    cmake \
+    g++ \
+    make \
+    git \
+    libssl-dev \
+    curl \
+    libasio-dev \
+    nlohmann-json3-dev \
+    libmosquitto-dev \
+    mosquitto-clients \
+    pkg-config && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY . /app
@@ -21,34 +32,6 @@ FROM ubuntu:22.04 AS app
 RUN apt-get update && apt-get install -y \
     git cmake build-essential libssl-dev libasio-dev nlohmann-json3-dev && \
     rm -rf /var/lib/apt/lists/*
-
-# 1. Build and install Paho MQTT C (with async and CMake package export)
-RUN git clone https://github.com/eclipse/paho.mqtt.c.git /tmp/paho-c && \
-    cd /tmp/paho-c && \
-    cmake -B build -S . \
-      -DPAHO_WITH_SSL=OFF \
-      -DPAHO_BUILD_STATIC=OFF \
-      -DPAHO_BUILD_SHARED=ON \
-      -DPAHO_BUILD_DOCUMENTATION=OFF \
-      -DPAHO_BUILD_SAMPLES=OFF \
-      -DCMAKE_INSTALL_PREFIX=/usr/local \
-      -DPAHO_ENABLE_TESTING=OFF \
-      -DPAHO_BUILD_DEPRECATED=OFF \
-      -DPAHO_WITH_CMAKE=ON && \
-    cmake --build build --target install && \
-    ldconfig
-
-# 2. Build and install Paho MQTT C++
-RUN git clone https://github.com/eclipse/paho.mqtt.cpp.git /tmp/paho-cpp && \
-    cd /tmp/paho-cpp && \
-    cmake -B build -S . \
-      -DPAHO_BUILD_STATIC=OFF \
-      -DPAHO_BUILD_DOCUMENTATION=OFF \
-      -DPAHO_WITH_SSL=OFF \
-      -DCMAKE_PREFIX_PATH=/usr/local \
-      -DCMAKE_INSTALL_PREFIX=/usr/local && \
-    cmake --build build --target install && \
-    ldconfig
 
 
 WORKDIR /app

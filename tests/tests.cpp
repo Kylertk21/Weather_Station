@@ -113,6 +113,8 @@ TEST_F(EmptyWeatherDataTest, TestReadDataFAIL) {   // Test read data FAIL
     EXPECT_FALSE(result);
 }
 
+
+
 TEST(BrokerTest, TestSendData) { // Test data can be sent to /device/requests
     GTEST_SKIP() << "Not implemented...";
 }

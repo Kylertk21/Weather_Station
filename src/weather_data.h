@@ -1,7 +1,7 @@
 //
 // Created by kylerk on 11/10/2025.
 //
-#include <iostream>
+#include <unordered_map>
 #include <string>
 #include <utility>
 using namespace std;
@@ -16,13 +16,21 @@ public:
     void set_data(const string& top, const int temp, const float press,
                   const float humid, const float ra, const float wi) {
 
-        this->topic = std::move(topic);
+        this->topic = top;
         this->temperature = temp;
         this->pressure = press;
         this->humidity = humid;
         this->rain = ra;
         this->wind = wi;
 
+    }
+    void populate_data() {
+        dataMap["topic"] = topic;
+        dataMap["temperature"] = temperature;
+        dataMap["pressure"] = pressure;
+        dataMap["humidity"] = humidity;
+        dataMap["rain"] = rain;
+        dataMap["wind"] = wind;
     }
 
     [[nodiscard]] string get_topic() const {
@@ -59,6 +67,8 @@ private:
     float humidity = 0.0;
     float rain = 0;
     float wind = 0.0;
+
+    std::unordered_map<string, string> dataMap;
 
     Weather_Data process_data();
 };

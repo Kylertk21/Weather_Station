@@ -68,12 +68,13 @@ TEST_F(WeatherDataTest, TestSetDataEMPTY) {
     EXPECT_FALSE(data.isPopulated(json));
 }
 
-TEST_F(WeatherDataTest, TestDataInJSONFormat) { // Data in JSON format
-
+TEST_F(WeatherDataTest, TestIsJsonFunction) { // Data in JSON format
+    EXPECT_TRUE(data.isJson(mock.getJson()));
 }
 
-TEST_F(WeatherDataTest, TestDataNOTInJSONFormat) { // Data NOT in JSON format
-    GTEST_SKIP() << "Not implemented...";
+TEST_F(WeatherDataTest, TestDataNOTInJSONFormat) { // Test fail when not in JSON
+    const std::string notJson = "This is not JSON";
+    EXPECT_FALSE(data.isJson(notJson));
 }
 
 TEST(BrokerTest, TestReadData) { // Test data can be read from /device/responses

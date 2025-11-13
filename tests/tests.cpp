@@ -21,7 +21,7 @@ public:
 
 class WeatherDataTest : public testing::Test {
 protected:
-    Weather_Data data;
+    Weather_Data data = Weather_Data();
     MockJsonProvider mock;
 
     void SetUp() override {
@@ -48,7 +48,7 @@ protected:
 
 class EmptyWeatherDataTest : public testing::Test {
 protected:
-    Weather_Data emptyData;
+    Weather_Data emptyData = Weather_Data();
     MockJsonProvider mock;
 
     void SetUp() override {

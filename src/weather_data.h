@@ -11,9 +11,18 @@ using namespace std;
 #define WEATHER_STATION_DASHBOARD_DATA_H
 
 class Weather_Data {
+
 public:
-    bool isPopulated;
-    Weather_Data() = default;
+    Weather_Data() {
+        topic = "";
+        temperature = 0;
+        pressure = 0.0;
+        humidity = 0.0;
+        rain = 0.0;
+        wind = 0.0;
+        isPopulated = false;
+    }
+
     void receive_data();
     void set_data(const string& top, const int temp, const float press,
                   const float humid, const float ra, const float wi) {
@@ -26,7 +35,8 @@ public:
         this->wind = wi;
 
     }
-    void populate_data() {
+
+    void populateData() {
         dataMap["topic"] = topic;
         dataMap["temperature"] = temperature;
         dataMap["pressure"] = pressure;
@@ -63,14 +73,14 @@ public:
         return isPopulated;
     }
 
-
 private:
     string topic;
-    int temperature = 0;
-    float pressure = 0.0;
-    float humidity = 0.0;
-    float rain = 0;
-    float wind = 0.0;
+    int temperature;
+    float pressure;
+    float humidity;
+    float rain;
+    float wind;
+    bool isPopulated;
 
     std::unordered_map<string, string> dataMap;
 

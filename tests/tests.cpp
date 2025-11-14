@@ -118,41 +118,73 @@ TEST_F(EmptyWeatherDataTest, TestReadDataFAIL) {   // Test read data FAIL
 }
 
 // ========================================================================================
-// INTEGRATION TESTS
+// BROKER TESTS
 // ========================================================================================
 
-class MQTT_Test_Client {
-private:
-    struct mosquitto *client = nullptr;
-    std::string broker_host;
-    int broker_port = 0;
-    std::atomic<bool> connected{false};
-    std::atomic<bool> message_received{false};
-    std::vector<std::string> received_messages;
-    std::string client_id;
+class BrokerTest : public testing::Test {
+protected:
+    MQTT_Client *client = nullptr;
 
-    static void on_connect_callback(struct mosquitto *mosq, void *obj, int rc) {
-        auto *test_client = static_cast<MQTT_Test_Client*>(obj);
-        test_client->connected = (rc == 0);
+    void SetUp() override {
+        std::cout << "\n=== MQTT Integration Test ===" << std::endl;
+        client = new MQTT_Client("test-client");
 
-        if (rc == 0) {
-            std::cout << "[MQTT] Connected Successfully To Broker" << std::endl;
-        } else {
-            std::cerr << "[MQTT] Connection Failed!: " << rc << std::endl;
+        ASSERT_TRUE(client->connect())
+            << "Failed to connect to MQTT Broker";
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+
+    void TearDown() override {
+        if (client) {
+            client->disconnect();
+            delete client;
+            client = nullptr;
         }
+        std::cout << "=== Test Complete ===\n" << std::endl;
     }
-public:
-    MQTT_Test_Client(const std::string& id = "test-client") : client_id(id) {
-        const char* host_env = std::getenv("MQTT_BROKER_HOST");
-        broker_host = host_env ? host_env : "mqtt-broker";
-
-        const char* port_env = std::getenv("MQTT_BROKER_PORT");
-        broker_port = port_env ? std::stoi(port_env) : 1883;
-
-        std::cout << "[MQTT] Configured for " << broker_host << ":" << broker_port << std::endl;
-    }
-
 };
+
+
+// ========================================================================================
+// TEST CONNECTION
+// ========================================================================================
+
+TEST_F(BrokerTest, TestConnect) {
+    client->connect();
+    EXPECT_TRUE(client->isConnected());
+}
+
+TEST_F(BrokerTest, TestConnectFail) {
+    client->disconnect();
+    EXPECT_FALSE(client->isConnected());
+}
+
+TEST_F(BrokerTest, TestDisconnect) {
+    client->disconnect();
+    EXPECT_TRUE(client->disconnect());
+}
+
+TEST_F(BrokerTest, TestDisconnectFail) {
+    client->disconnect();
+    EXPECT_FALSE(client->disconnect());
+}
+
+TEST_F(BrokerTest, TestPublishMessage) {
+    const std::string topic = "test/device1/requests";
+    const std::string payload ="Request POLL";
+
+    bool result = client->publish(topic, payload);
+    EXPECT_TRUE(result);
+}
+
+TEST_F(BrokerTest, TestSubscribeToTopic) {
+    const std::string topic = "test/device1/responses";
+
+    bool result = client->subscribe(topic);
+    EXPECT_TRUE(result);
+}
+
 
 
 TEST(BrokerTest, TestSendData) { // Test data can be sent to /device/requests

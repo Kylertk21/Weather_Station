@@ -8,15 +8,16 @@
 #include <string>
 #include <iostream>
 #include <utility>
+#include <ctime>
 using namespace std;
 
 #ifndef WEATHER_STATION_DASHBOARD_DATA_H
 #define WEATHER_STATION_DASHBOARD_DATA_H
 
-class Weather_Data {
+class WeatherData {
 
 public:
-    Weather_Data() {
+    WeatherData() {
         topic = "";
         temperature = 0;
         pressure = 0.0;
@@ -24,10 +25,10 @@ public:
         rain = 0.0;
         wind = 0.0;
         isPopulated = false;
-    }
+        timestamp = time(nullptr);
 
-    void receive_data();
-    void set_data(const string& top, const int temp, const float press,
+    }
+    void setData(const string& top, const int temp, const float press,
                   const float humid, const float ra, const float wi) {
 
         this->topic = top;
@@ -48,27 +49,27 @@ public:
         dataMap["wind"] = std::to_string(wind);
     }
 
-    [[nodiscard]] string get_topic() const {
+    [[nodiscard]] string getTopic() const {
         return topic;
     }
-    [[nodiscard]] int get_temperature() const {
+    [[nodiscard]] int getTemperature() const {
         return temperature;
     }
-    [[nodiscard]] float get_pressure() const {
+    [[nodiscard]] float getPressure() const {
         return pressure;
     }
-    [[nodiscard]] float get_humidity() const {
+    [[nodiscard]] float getHumidity() const {
         return humidity;
     }
-    [[nodiscard]] float get_rain() const {
+    [[nodiscard]] float getRain() const {
         return rain;
     }
-    [[nodiscard]] float get_wind() const {
+    [[nodiscard]] float getWind() const {
         return wind;
     }
 
-    static string readData() {
-        return "";
+    static string receiveData() {
+        return "No data received";
     }
 
     static void connectBroker() {
@@ -87,11 +88,12 @@ private:
     float humidity;
     float rain;
     float wind;
+    time_t timestamp{};
     bool isPopulated;
 
     std::unordered_map<string, string> dataMap;
 
-    Weather_Data process_data();
+    WeatherData process_data();
 };
 
 // ========================================================================================
@@ -138,6 +140,10 @@ public:
     bool subscribe(std::string topic) {
 
         return false;
+    }
+    std::string getLastMessage() {
+
+        return "No data in queue!\n";
     }
 
 

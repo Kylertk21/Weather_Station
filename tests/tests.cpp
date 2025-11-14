@@ -106,13 +106,38 @@ TEST_F(WeatherDataTest, TestDataNOTInJSONFormat) { // Test fail when not in JSON
     EXPECT_FALSE(data.validateData(notJson));
 }
 
-TEST_F(WeatherDataTest, TestReadData) { // Test data can be read from /device/responses
+
+// ========================================================================
+// SERVER - MQTT REQUEST AND RESPONSE
+// ========================================================================
+
+TEST_F(WeatherDataTest, TestRequestData) {
+    MQTT_Client client("test");
+    const std::string request = "request update";
+    ASSERT_TRUE(WeatherData::connectBroker());
+    ASSERT_TRUE(WeatherData::requestData(request));
+
+    std::string receivedData = data.receiveData();
+    EXPECT_EQ(data.validateData(receivedData), true);
+}
+
+TEST_F(WeatherDataTest, TestRequestDataFAIL) {
+    const std::string request = "request update";
+    ASSERT_TRUE(WeatherData::connectBroker());
+    ASSERT_TRUE(WeatherData::requestData(request));
+
+    std::string receivedData = data.receiveData();
+    EXPECT_NE(data.validateData(receivedData), true);
+}
+
+
+TEST_F(WeatherDataTest, TestReceiveData) { // Test data can be read from /device/responses
     const string returned = data.receiveData();
     const bool result = data.validateData(returned);
     EXPECT_TRUE(result);
 }
 
-TEST_F(EmptyWeatherDataTest, TestReadDataFAIL) {   // Test read data FAIL
+TEST_F(EmptyWeatherDataTest, TestReceiveDataFAIL) {   // Test read data FAIL
     const string returned = emptyData.receiveData();
     const bool result = emptyData.validateData(returned);
     EXPECT_FALSE(result);

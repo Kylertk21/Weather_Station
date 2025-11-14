@@ -24,7 +24,7 @@ public:
         humidity = 0.0;
         rain = 0.0;
         wind = 0.0;
-        isPopulated = false;
+        isValid = false;
         timestamp = time(nullptr);
 
     }
@@ -68,17 +68,25 @@ public:
         return wind;
     }
 
-    static string receiveData() {
+    static bool connectBroker() {
+
+        return false;
+    }
+
+    static bool requestData(const string& request) {
+
+        return false;
+    }
+
+    string receiveData() {
+
         return "No data received";
     }
 
-    static void connectBroker() {
-
-    }
 
     bool validateData(const string& data) {
-        this->isPopulated = false;
-        return isPopulated;
+        this->isValid = false;
+        return isValid;
     }
 
 private:
@@ -89,8 +97,7 @@ private:
     float rain;
     float wind;
     time_t timestamp{};
-    bool isPopulated;
-
+    std::atomic<bool> isValid;
     std::unordered_map<string, string> dataMap;
 
     WeatherData process_data();

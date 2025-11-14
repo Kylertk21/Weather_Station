@@ -6,6 +6,7 @@
 #include <nlohmann/json.hpp>
 #include "../src/weather_data.h"
 #include "../src/routes.h"
+#include <vector>
 
 class IJsonProvider {
 public:
@@ -125,7 +126,32 @@ private:
     struct mosquitto *client = nullptr;
     std::string broker_host;
     int broker_port = 0;
-    std::atomic<bool>
+    std::atomic<bool> connected{false};
+    std::atomic<bool> message_received{false};
+    std::vector<std::string> received_messages;
+    std::string client_id;
+
+    static void on_connect_callback(struct mosquitto *mosq, void *obj, int rc) {
+        auto *test_client = static_cast<MQTT_Test_Client*>(obj);
+        test_client->connected = (rc == 0);
+
+        if (rc == 0) {
+            std::cout << "[MQTT] Connected Successfully To Broker" << std::endl;
+        } else {
+            std::cerr << "[MQTT] Connection Failed!: " << rc << std::endl;
+        }
+    }
+public:
+    MQTT_Test_Client(const std::string& id = "test-client") : client_id(id) {
+        const char* host_env = std::getenv("MQTT_BROKER_HOST");
+        broker_host = host_env ? host_env : "mqtt-broker";
+
+        const char* port_env = std::getenv("MQTT_BROKER_PORT");
+        broker_port = port_env ? std::stoi(port_env) : 1883;
+
+        std::cout << "[MQTT] Configured for " << broker_host << ":" << broker_port << std::endl;
+    }
+
 };
 
 

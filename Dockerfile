@@ -12,8 +12,14 @@ RUN apt-get update && apt-get install -y  \
     nlohmann-json3-dev \
     libmosquitto-dev \
     mosquitto-clients \
-    pkg-config && \
+    pkg-config  \
+    libboost-all-dev && \
     rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth=1 https://github.com/CrowCpp/Crow.git /tmp/crow && \
+    mkdir -p /usr/local/include && \
+    cp -r /tmp/crow/include/* /usr/local/include/ && \
+    rm -rf /tmp/crow
 
 WORKDIR /app
 COPY . /app
@@ -30,7 +36,12 @@ RUN rm -rf build && \
 FROM ubuntu:22.04 AS app
 
 RUN apt-get update && apt-get install -y \
-    git cmake build-essential libssl-dev libasio-dev nlohmann-json3-dev && \
+    git \
+    cmake \
+    build-essential \
+    libssl-dev \
+    libasio-dev \
+    nlohmann-json3-dev && \
     rm -rf /var/lib/apt/lists/*
 
 

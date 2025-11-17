@@ -10,7 +10,9 @@ services:
     ports:
       - "18080:18080"
     volumes:
-      - .:/app
+      - ./src:/app/src
+      - ./include:/app/include
+      - ./CMakeLists.txt:/app/CMakeLists.txt
     restart: unless-stopped
     stdin_open: true
     tty: true
@@ -48,7 +50,10 @@ services:
         ./build/runTests --gtest_color=yes --gtest_brief=0
       "
     volumes:
-      - .:/app
+      - ./src:/app/src
+      - ./include:/app/include
+      - ./tests:/app/tests
+      - ./CMakeLists.txt:/app/CMakeLists.txt
     networks:
       - weather_station_network
 
@@ -62,8 +67,6 @@ services:
       - "1883:1883"
     volumes:
       - ./mosquitto/config:/mosquitto/config
-      - ./mosquitto/data:/mosquitto/data
-      - ./mosquitto/log:/mosquitto/log
     networks:
       - weather_station_network
     restart: unless-stopped

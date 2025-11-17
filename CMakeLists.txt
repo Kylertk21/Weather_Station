@@ -48,6 +48,8 @@ if(BUILD_TESTS)
     add_executable(runTests
             src/weather_data.h
             tests/tests.cpp
+            tests/tests.cpp
+            tests/tests.cpp
     )
     target_include_directories(runTests PRIVATE
             ${CMAKE_SOURCE_DIR}/external/Crow/include

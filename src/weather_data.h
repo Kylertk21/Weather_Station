@@ -149,6 +149,8 @@ public:
     void clearAllReadings();
     bool connect();
 
+    bool commitReading(const WeatherData & data);
+    int getDataCount(const char * str);
 };
 
 // ========================================================================================

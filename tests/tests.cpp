@@ -323,7 +323,8 @@ protected:
                     {"humidity", humidity},
                     {"rain", rain},
                     {"wind", wind},
-                    {"timestamp", time(nullptr)}
+                    {"timestamp", time(nullptr)
+                    }
         };
    }
 
@@ -395,6 +396,8 @@ TEST_F(CrowAppTest, TestGetDataInJson) { // Test data retrieved from server is i
     EXPECT_FLOAT_EQ(json_response["humidity"].d(), 45.5);
     EXPECT_FLOAT_EQ(json_response["rain"].d(), 0.1);
     EXPECT_FLOAT_EQ(json_response["wind"].d(), 5.4);
+    EXPECT_NE(json_response["timestamp"].d(), time(nullptr));
+    EXPECT_GT(json_response["timestamp"].d(), 0);
 }
 
 TEST_F(CrowAppTest, TestGetNotInJson) { // TODO: finish TestNotInJson
@@ -500,21 +503,79 @@ TEST_F(DataBaseTest, TestDatabaseCommit) {
     ASSERT_TRUE(db->connect());
     EXPECT_TRUE(db->isConnected());
 
-    WeatherData data;
-    data.setData(1, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4);
+    const auto now = std::chrono::system_clock::now();
+    const std::time_t timer = std::chrono::system_clock::to_time_t(now);
 
-    bool inserted = db->commitReading(data);
+    WeatherData data;
+    data.setData(1, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4, timer);
+
+    const bool inserted = db->commitReading(data);
     ASSERT_TRUE(inserted) << "Failed to insert reading";
 
-    int count = db->getDataCount("test")
+    const int count = db->getDataCount("test-topic");
+    EXPECT_GT(count, 0);
 }
 
-TEST_F(DataBaseTest, TestDatabaseCommitFail) {
-    GTEST_SKIP() << "Not implemented..." << std::endl;
+TEST_F(DataBaseTest, TestDatabaseFailNotConnected) {
+    const auto now = std::chrono::system_clock::now();
+    const std::time_t timer = std::chrono::system_clock::to_time_t(now);
+
+    WeatherData data;
+
+    data.setData(1, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4, timer);
+
+    bool inserted = db->commitReading(data);
+
+    EXPECT_FALSE(inserted) << "Should fail when not connected";
 }
+
+TEST_F(DataBaseTest, TestDatabaseCommitFailEmptyCommit) {
+    ASSERT_TRUE(db->connect());
+    EXPECT_TRUE(db->isConnected());
+
+    WeatherData emptyData;
+    emptyData.setData(0, "", 0, 0.0, 0.0, 0.0, 0.0, time(nullptr));
+
+    const bool inserted = db->commitReading(emptyData);
+    ASSERT_FALSE(inserted);
+
+    const int count = db->getDataCount(0);
+    EXPECT_EQ(count, 0);
+}
+
+TEST_F(DataBaseTest, TestDatabaseCommitFailInvalidID) {
+    ASSERT_TRUE(db->connect());
+    EXPECT_TRUE(db->isConnected());
+    const auto now = std::chrono::system_clock::now();
+    const std::time_t timer = std::chrono::system_clock::to_time_t(now);
+
+    WeatherData data;
+    data.setData(0, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4, timer);
+
+    const bool inserted = db->commitReading(data);
+    ASSERT_FALSE(inserted);
+
+    const int count = db->getDataCount(0);
+    EXPECT_EQ(count, 0);
+}
+// TODO: test removing from database
+
+// ======================================================================================
+// DATABASE QUERY TESTS
+// ======================================================================================
 
 TEST_F(DataBaseTest, TestDatabaseQuery) {
-    GTEST_SKIP() << "Not implemented..." << std::endl;
+    ASSERT_TRUE(db->connect());
+    EXPECT_TRUE(db->isConnected());
+    const auto now = std::chrono::system_clock::now();
+    const std::time_t timer = std::chrono::system_clock::to_time_t(now);
+    WeatherData data;
+
+    data.setData(1, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4, timer);
+    ASSERT_TRUE(db->commitReading(data)); // TODO: finish TestDatabaseQuery
+
+
+
 }
 
 TEST_F(DataBaseTest, TestDatabaseQueryFail) {

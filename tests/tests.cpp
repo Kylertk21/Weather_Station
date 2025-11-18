@@ -30,13 +30,19 @@ protected:
     MockJsonProvider mock;
 
     void SetUp() override {
+        std::cout << "\n=== Weather Data Test Setup ===" << std::endl;
+        auto now = std::chrono::system_clock::now();
+        std::time_t timer = std::chrono::system_clock::to_time_t(now);
         data.setData(
-            "device1",
+            1,
+            "device1/responses",
             72,
             1013.2,
             45.5,
             0.1,
-            5.4 );
+            5.4,
+            timer
+            );
         ON_CALL(mock, getJson())
             .WillByDefault(testing::Return(
                 R"({
@@ -45,8 +51,12 @@ protected:
                         "pressure":1013.2,
                         "humidity":45.5,
                         "rain":0.1,
-                        "wind":5.4
+                        "wind":5.4,
+                        "timestamp":"Wed Nov 17 13:51:40 2025"
                                     })"));
+    }
+    void TearDown() override {
+        std::cout << "=== Weather Data Test Complete ===\n" << std::endl;
     }
 
 };
@@ -58,12 +68,14 @@ protected:
 
     void SetUp() override {
         emptyData.setData(
+            1,
             "",
             0,
             0.0,
             0.0,
             0.0,
-            0.0 );
+            0.0,
+            time(nullptr));
         ON_CALL(mock, getJson())
             .WillByDefault(testing::Return(
                 R"({})"));
@@ -71,13 +83,15 @@ protected:
 };
 
 TEST_F(WeatherDataTest, TestSetData) { // Test data is set in class structure
-
+    EXPECT_EQ(data.getDataID(), 1);
     EXPECT_EQ(data.getTopic(), "device1/responses");
     EXPECT_EQ(data.getTemperature(), 72);
     EXPECT_FLOAT_EQ(data.getPressure(), 1013.2);
     EXPECT_FLOAT_EQ(data.getHumidity(), 45.5);
     EXPECT_FLOAT_EQ(data.getRain(), 0.1);
     EXPECT_FLOAT_EQ(data.getWind(), 5.4);
+    EXPECT_NE(data.getTimeStamp(), time(nullptr));
+    EXPECT_GT(data.getTimeStamp(), 0);
 
     const std::string json = mock.getJson();
     EXPECT_TRUE(data.validateData(json));
@@ -85,16 +99,26 @@ TEST_F(WeatherDataTest, TestSetData) { // Test data is set in class structure
 }
 
 TEST_F(EmptyWeatherDataTest, TestSetDataEMPTY) { // Test data set empty
-
+    EXPECT_EQ(emptyData.getDataID(), 0);
     EXPECT_EQ(emptyData.getTopic(), "");
     EXPECT_EQ(emptyData.getTemperature(), 0);
     EXPECT_FLOAT_EQ(emptyData.getPressure(), 0.0);
     EXPECT_FLOAT_EQ(emptyData.getHumidity(), 0.0);
     EXPECT_FLOAT_EQ(emptyData.getRain(), 0.0);
     EXPECT_FLOAT_EQ(emptyData.getWind(), 0.0);
+    EXPECT_EQ(emptyData.getTimeStamp(), time(nullptr));
+    EXPECT_EQ(emptyData.getTimeStamp(), time(nullptr));
 
     const std::string json = mock.getJson();
     EXPECT_FALSE(emptyData.validateData(json));
+}
+
+TEST_F(WeatherDataTest, TestValidateTimeStamp) { // TODO: TestValidateTimeStamp
+    GTEST_SKIP() << "Not Implemented ..." << std::endl;
+}
+
+TEST_F(WeatherDataTest, TestValidateTimeStampFAIL) { // TODO: TestValidateTimeStampFAIL
+    GTEST_SKIP() << "Not Implemented ..." << std::endl;
 }
 
 TEST_F(WeatherDataTest, TestIsJsonFunction) { // Data in JSON format
@@ -152,7 +176,7 @@ protected:
     MQTT_Client *client = nullptr;
 
     void SetUp() override {
-        std::cout << "\n=== MQTT Integration Test ===" << std::endl;
+        std::cout << "\n=== MQTT Integration Test Setup ===" << std::endl;
         client = new MQTT_Client("test-client");
 
         ASSERT_TRUE(client->connect())
@@ -188,7 +212,7 @@ protected:
             delete client;
             client = nullptr;
         }
-        std::cout << "=== Test Complete ===\n" << std::endl;
+        std::cout << "=== MQTT Integration Test Complete ===\n" << std::endl;
     }
 };
 
@@ -280,6 +304,33 @@ protected:
     crow::request req;
     crow::response res;
 
+    void SetUp() override {
+        std::cout << "\n=== Crow App Test Setup ===" << std::endl;
+    }
+
+    static json createSensorReading(
+    const std::string& device_id = "device1",
+    int temp = 72,
+    float pressure = 1013.2,
+    float humidity = 45.5,
+    float rain = 0.1,
+    float wind = 5.4
+    ) {
+        return json{
+                    {"device", device_id},
+                    {"temp", temp},
+                    {"pressure", pressure},
+                    {"humidity", humidity},
+                    {"rain", rain},
+                    {"wind", wind},
+                    {"timestamp", time(nullptr)}
+        };
+   }
+
+    void TearDown() override {
+        std::cout << "=== Crow App Test Complete ===\n" << std::endl;
+    }
+
 };
 
 TEST_F(CrowAppTest, TestIndexRoute) { // Test index page available
@@ -295,12 +346,40 @@ TEST_F(CrowAppTest, TestIndexRoute) { // Test index page available
     EXPECT_NE(res.body.find("Weather Station Dashboard"), std::string::npos);
 }
 
-TEST_F(CrowAppTest, TestIndexRouteFAIL) { // Index page not available
-    GTEST_SKIP() << "Not implemented...";
+TEST_F(CrowAppTest, TestIndexRouteWrongMethod) { // Index page not available
+    req.url = "/";
+    req.method = "POST"_method;
+
+    app.handle_full(req, res);
+
+    EXPECT_NE(res.code, 200);
+    EXPECT_TRUE(res.code == 404 || res.code == 405);
 }
 
-TEST_F(CrowAppTest, TestDataInJson) { // Test data retrieved from server is in json format
-    req.url = "/data";
+TEST_F(CrowAppTest, TestBadRoute) {
+    req.url = "/doesntexist";
+    req.method = "GET"_method;
+
+    app.handle_full(req, res);
+
+    EXPECT_EQ(res.code, 404);
+}
+
+TEST_F(CrowAppTest, TestPostData) {
+    req.url = "/data/weather";
+    json postData = createSensorReading();
+    std::string body = postData.dump();
+
+    req.body = body;
+    req.add_header("Content-Type", "application/json");
+    app.handle_full(req, res);
+
+    EXPECT_EQ(res.code, 200);
+    EXPECT_TRUE(res.body.find("success") != std::string::npos);
+}
+
+TEST_F(CrowAppTest, TestGetDataInJson) { // Test data retrieved from server is in json format
+    req.url = "/data/weather";
     req.method = "GET"_method;
 
     app.handle_full(req, res);
@@ -318,16 +397,26 @@ TEST_F(CrowAppTest, TestDataInJson) { // Test data retrieved from server is in j
     EXPECT_FLOAT_EQ(json_response["wind"].d(), 5.4);
 }
 
-TEST_F(CrowAppTest, TestNotInJson) {
+TEST_F(CrowAppTest, TestGetNotInJson) { // TODO: finish TestNotInJson
     req.url = "/";
     req.method = "GET"_method;
 
     app.handle_full(req, res);
 
-    EXPECT_EQ(res.code, 200);
+    ASSERT_EQ(res.code, 200);
 
     const auto json_response = crow::json::load(res.body);
-    ASSERT_FALSE(json_response);
+    EXPECT_FALSE(json_response);
+}
+
+TEST_F(CrowAppTest, TestGetDataMissingParams) {
+    req.url = "/data/weather?device=";
+    req.method = "GET"_method;
+    ASSERT_EQ(res.code, 200);
+
+    app.handle_full(req, res);
+
+    EXPECT_EQ(res.code, 400);
 }
 
 // ======================================================================================
@@ -341,27 +430,94 @@ TEST_F(CrowAppTest, TestNotInJson) {
 // DATABASE TESTS
 // ======================================================================================
 
-TEST(DatabaseTest, TestDatabaseConnection) {
+class DataBaseTest : public testing::Test {
+protected:
+    WeatherDataBase* db = nullptr;
+    std::string test_device = "test-device1";
+
+    void SetUp() override {
+        std::string host = std::getenv("DATABASE_HOST") // if specified use DATABASE_HOST
+            ? std::getenv("DATABASE_HOST")
+            : "localhost"; // otherwise use localhost
+        int port = std::getenv("DATABASE_PORT")
+            ? std::stoi(std::getenv("DATABASE_PORT"))
+            : 5432;
+        std::cout << "\n Database Test Setup ===" << std::endl;
+        std::cout << "[DB] Connecting to " << host << ":" << port << std::endl;
+
+        db = new WeatherDataBase();
+    }
+    void TearDown() override {
+        if (db) {
+            if (db->isConnected()) {
+                db->clearAllReadings();
+                db->disconnect();
+            }
+            delete db;
+            db = nullptr;
+        }
+        std::cout << "=== Database Test Complete ===\n" << std::endl;
+    }
+
+// ======================================================================================
+// DATABASE CONNECTION TESTS
+// ======================================================================================
+
+};
+
+TEST_F(DataBaseTest, TestDatabaseConnection) {
+    bool connected = db->connect();
+
+    ASSERT_TRUE(connected);
+    EXPECT_TRUE(db->isConnected());
+}
+
+TEST_F(DataBaseTest, TestDatabaseConnectionFail) {
+    WeatherDataBase bad_db("invalid_host", 5555, "wrong_db", "wrong_user", "wrong_pass");
+
+    bool connected = bad_db.connect();
+
+    EXPECT_FALSE(connected);
+    EXPECT_FALSE(bad_db.isConnected);
+}
+
+TEST_F(DataBaseTest, TestReconnect) {
+    ASSERT_TRUE(db->connect());
+    EXPECT_TRUE(db->isConnected());
+
+    db->disconnect();
+    EXPECT_FALSE(db->isConnected());
+
+    ASSERT_TRUE(db->connect());
+    EXPECT_TRUE(db->isConnected());
+}
+
+// ======================================================================================
+// DATABASE TRANSACTION TESTS
+// ======================================================================================
+
+TEST_F(DataBaseTest, TestDatabaseCommit) {
+    ASSERT_TRUE(db->connect());
+    EXPECT_TRUE(db->isConnected());
+
+    WeatherData data;
+    data.setData(1, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4);
+
+    bool inserted = db->commitReading(data);
+    ASSERT_TRUE(inserted) << "Failed to insert reading";
+
+    int count = db->getDataCount("test")
+}
+
+TEST_F(DataBaseTest, TestDatabaseCommitFail) {
     GTEST_SKIP() << "Not implemented..." << std::endl;
 }
 
-TEST(DatabaseTest, TestDatabaseConnectionFail) {
+TEST_F(DataBaseTest, TestDatabaseQuery) {
     GTEST_SKIP() << "Not implemented..." << std::endl;
 }
 
-TEST(DatabaseTest, TestDatabaseCommit) {
-    GTEST_SKIP() << "Not implemented..." << std::endl;
-}
-
-TEST(DatabaseTest, TestDatabaseCommitFail) {
-    GTEST_SKIP() << "Not implemented..." << std::endl;
-}
-
-TEST(DatabaseTest, TestDatabaseQuery) {
-    GTEST_SKIP() << "Not implemented..." << std::endl;
-}
-
-TEST(DatabaseTest, TestDatabaseQueryFail) {
+TEST_F(DataBaseTest, TestDatabaseQueryFail) {
     GTEST_SKIP() << "Not implemented..." << std::endl;
 }
 

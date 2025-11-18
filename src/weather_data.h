@@ -8,6 +8,8 @@
 #include <string>
 #include <iostream>
 #include <utility>
+#include <chrono>
+#include <iomanip>
 #include <ctime>
 using namespace std;
 
@@ -15,9 +17,22 @@ using namespace std;
 #define WEATHER_STATION_DASHBOARD_DATA_H
 
 class WeatherData {
+    int data_ID;
+    string topic;
+    int temperature;
+    float pressure;
+    float humidity;
+    float rain;
+    float wind;
+    time_t timestamp{};
+    std::atomic<bool> isValid;
+    std::unordered_map<string, string> dataMap;
+
+    WeatherData process_data();
 
 public:
     WeatherData() {
+        data_ID = 0;
         topic = "";
         temperature = 0;
         pressure = 0.0;
@@ -28,27 +43,33 @@ public:
         timestamp = time(nullptr);
 
     }
-    void setData(const string& top, const int temp, const float press,
-                  const float humid, const float ra, const float wi) {
-
+    void setData(const int i, const string& top, const int temp, const float press,
+                  const float humid, const float ra, const float wi, const time_t t) {
+        this->data_ID = i;
         this->topic = top;
         this->temperature = temp;
         this->pressure = press;
         this->humidity = humid;
         this->rain = ra;
         this->wind = wi;
-
+        this->timestamp = t;
     }
 
     void populateData() {
+        dataMap["data ID"] = data_ID;
         dataMap["topic"] = topic;
         dataMap["temperature"] = std::to_string(temperature);
         dataMap["pressure"] = std::to_string(pressure);
         dataMap["humidity"] = std::to_string(humidity);
         dataMap["rain"] = std::to_string(rain);
         dataMap["wind"] = std::to_string(wind);
+        dataMap["timestamp"] = std::to_string(timestamp);
+
     }
 
+    [[nodiscard]] int getDataID() const {
+        return data_ID;
+    }
     [[nodiscard]] string getTopic() const {
         return topic;
     }
@@ -66,6 +87,9 @@ public:
     }
     [[nodiscard]] float getWind() const {
         return wind;
+    }
+    [[nodiscard]] time_t getTimeStamp() const {
+        return timestamp;
     }
 
     static bool connectBroker() {
@@ -88,19 +112,43 @@ public:
         this->isValid = false;
         return isValid;
     }
+};
 
-private:
-    string topic;
-    int temperature;
-    float pressure;
-    float humidity;
-    float rain;
-    float wind;
-    time_t timestamp{};
-    std::atomic<bool> isValid;
-    std::unordered_map<string, string> dataMap;
+// ========================================================================================
+// Weather Database
+// ========================================================================================
 
-    WeatherData process_data();
+class WeatherDataBase {
+    string host;
+    int port;
+    string db_name;
+    string db_user;
+    string db_pass;
+    atomic<bool> connected = false;
+
+public:
+    WeatherDataBase() = default;
+    WeatherDataBase(const char * h, int pt, const char * n, const char * u, const char * ps) : port(5432) {
+        host = h;
+        port = pt;
+        db_name = n;
+        db_user = u;
+        db_pass = ps;
+    }
+
+    bool disconnect() {
+
+        return connected;
+    }
+
+    bool isConnected() {
+
+        return connected;
+    }
+
+    void clearAllReadings();
+    bool connect();
+
 };
 
 // ========================================================================================

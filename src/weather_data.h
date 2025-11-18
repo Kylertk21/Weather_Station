@@ -11,6 +11,8 @@
 #include <chrono>
 #include <iomanip>
 #include <ctime>
+#include <sstream>
+
 using namespace std;
 
 #ifndef WEATHER_STATION_DASHBOARD_DATA_H
@@ -25,7 +27,7 @@ class WeatherData {
     float rain;
     float wind;
     time_t timestamp{};
-    std::atomic<bool> isValid;
+    std::atomic<bool> isValid{};
     std::unordered_map<string, string> dataMap;
 
     WeatherData process_data();
@@ -44,7 +46,7 @@ public:
 
     }
     void setData(const int i, const string& top, const int temp, const float press,
-                  const float humid, const float ra, const float wi, const time_t t) {
+                  const float humid, const float ra, const float wi, const string &t) {
         this->data_ID = i;
         this->topic = top;
         this->temperature = temp;
@@ -52,11 +54,21 @@ public:
         this->humidity = humid;
         this->rain = ra;
         this->wind = wi;
-        this->timestamp = t;
+
+        // convert string t to time_t
+        std::tm tm_struct = {};
+        std::istringstream ss(t);
+        ss >> std::get_time(&tm_struct, "%Y-%m-%d %H:%M:%S");
+
+        if (ss.fail()) {
+            std::cerr << "Error parsing time string" << std::endl;
+        } else {
+            this->timestamp = std::mktime(&tm_struct);
+        }
     }
 
     void populateData() {
-        dataMap["data ID"] = data_ID;
+        dataMap["data ID"] = std::to_string(data_ID);
         dataMap["topic"] = topic;
         dataMap["temperature"] = std::to_string(temperature);
         dataMap["pressure"] = std::to_string(pressure);
@@ -64,7 +76,6 @@ public:
         dataMap["rain"] = std::to_string(rain);
         dataMap["wind"] = std::to_string(wind);
         dataMap["timestamp"] = std::to_string(timestamp);
-
     }
 
     [[nodiscard]] int getDataID() const {
@@ -90,6 +101,16 @@ public:
     }
     [[nodiscard]] time_t getTimeStamp() const {
         return timestamp;
+    }
+
+    static string convertTime (const time_t time) {
+        std::tm tm{};
+        localtime_r(&time, &tm);
+
+        std::ostringstream oss;
+
+        oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+        return oss.str();
     }
 
     static bool connectBroker() {
@@ -120,20 +141,28 @@ public:
 
 class WeatherDataBase {
     string host;
-    int port;
+    int port{};
+    int dataCount{};
     string db_name;
     string db_user;
     string db_pass;
     atomic<bool> connected = false;
+    atomic<bool> committed = false;
 
 public:
     WeatherDataBase() = default;
     WeatherDataBase(const char * h, int pt, const char * n, const char * u, const char * ps) : port(5432) {
         host = h;
         port = pt;
+        dataCount = 0;
         db_name = n;
         db_user = u;
         db_pass = ps;
+    }
+
+    bool connect() {
+
+        return connected;
     }
 
     bool disconnect() {
@@ -146,11 +175,19 @@ public:
         return connected;
     }
 
-    void clearAllReadings();
-    bool connect();
+    bool commitReading(const WeatherData & data) {
 
-    bool commitReading(const WeatherData & data);
-    int getDataCount(const char * str);
+         return committed;
+    }
+
+    static void clearAllReadings() {
+
+    }
+
+    int getDataCount(const char * str) const {
+
+        return dataCount;
+    }
 };
 
 // ========================================================================================
@@ -206,60 +243,6 @@ public:
 
 
 };
-
-/*
-
-class MQTT_Test_Client {
-private:
-    struct mosquitto *client = nullptr;
-    std::string broker_host;
-    int broker_port = 0;
-    std::atomic<bool> connected{false};
-    std::atomic<bool> message_received{false};
-    std::vector<std::string> received_messages;
-    std::string client_id;
-
-
-    static void on_connect_callback(struct mosquitto *mosq, void *obj, int rc) {
-        auto *test_client = static_cast<MQTT_Test_Client*>(obj);
-        test_client->connected = (rc == 0);
-
-        if (rc == 0) {
-            std::cout << "[MQTT] Connected Successfully To Broker" << std::endl;
-        } else {
-            std::cerr << "[MQTT] Connection Failed!: " << rc << std::endl;
-        }
-    }
-
-    static void on_message_callback(struct mosquitto *mosq, void *obj,
-                                    const struct mosquitto_message *message) {
-        auto *test_client = static_cast<MQTT_Test_Client*>(obj);
-        const std::string msg(static_cast<char*>(message->payload), message->payloadlen);
-        test_client->received_messages.push_back(msg);
-        test_client->message_received = true;
-
-        std::cout << "[MQTT] Received Message on Topic: '" << message->topic
-                  << "': " << msg << std::endl;
-    }
-
-    static void on_subscribe_callback(struct mosquitto *mosq, void *o){}
-
-
-public:
-    MQTT_Test_Client(const std::string& id = "test-client") : client_id(id) {
-        const char* host_env = std::getenv("MQTT_BROKER_HOST");
-        broker_host = host_env ? host_env : "mqtt-broker";
-
-        const char* port_env = std::getenv("MQTT_BROKER_PORT");
-        broker_port = port_env ? std::stoi(port_env) : 1883;
-
-        std::cout << "[MQTT] Configured for " << broker_host << ":" << broker_port << std::endl;
-    }
-
-};
- */
-
-
 
 
 #endif //WEATHER_STATION_DASHBOARD_DATA_H

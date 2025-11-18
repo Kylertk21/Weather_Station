@@ -31,8 +31,10 @@ protected:
 
     void SetUp() override {
         std::cout << "\n=== Weather Data Test Setup ===" << std::endl;
-        auto now = std::chrono::system_clock::now();
-        std::time_t timer = std::chrono::system_clock::to_time_t(now);
+        chrono::system_clock::time_point time_point = std::chrono::system_clock::now();
+        std::time_t tt = std::chrono::system_clock::to_time_t(time_point);
+        string formatted_time = WeatherData::convertTime(tt);
+
         data.setData(
             1,
             "device1/responses",
@@ -41,7 +43,7 @@ protected:
             45.5,
             0.1,
             5.4,
-            timer
+            formatted_time
             );
         ON_CALL(mock, getJson())
             .WillByDefault(testing::Return(
@@ -52,7 +54,7 @@ protected:
                         "humidity":45.5,
                         "rain":0.1,
                         "wind":5.4,
-                        "timestamp":"Wed Nov 17 13:51:40 2025"
+                        "timestamp":{"2025-11-18 15:45:05"}
                                     })"));
     }
     void TearDown() override {
@@ -75,7 +77,7 @@ protected:
             0.0,
             0.0,
             0.0,
-            time(nullptr));
+            "" );
         ON_CALL(mock, getJson())
             .WillByDefault(testing::Return(
                 R"({})"));
@@ -113,23 +115,41 @@ TEST_F(EmptyWeatherDataTest, TestSetDataEMPTY) { // Test data set empty
     EXPECT_FALSE(emptyData.validateData(json));
 }
 
-TEST_F(WeatherDataTest, TestValidateTimeStamp) { // TODO: TestValidateTimeStamp
-    GTEST_SKIP() << "Not Implemented ..." << std::endl;
+TEST_F(WeatherDataTest, TestTimeStampPopulated) {
+    time_t timestamp = data.getTimeStamp();
+    EXPECT_GT(timestamp, 0);
+
+    time_t now = time(nullptr);
+    EXPECT_NEAR(timestamp, now, 5);
 }
 
-TEST_F(WeatherDataTest, TestValidateTimeStampFAIL) { // TODO: TestValidateTimeStampFAIL
-    GTEST_SKIP() << "Not Implemented ..." << std::endl;
+TEST_F(WeatherDataTest, TestValidateTimeStampFormat) {
+    time_t ts = data.getTimeStamp();
+    std::string formatted = WeatherData::convertTime(ts);
+
+    std::tm tm{};
+    localtime_r(&ts, &tm);
+
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+
+    EXPECT_EQ(formatted, oss.str());
 }
 
-TEST_F(WeatherDataTest, TestIsJsonFunction) { // Data in JSON format
+TEST_F(WeatherDataTest, TestInvalidTimeStampFormat) {
+    std::string bad_ts = "not-a-timestamp";
+
+    std::tm tm{};
+    std::istringstream ss(bad_ts);
+
+    ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+
+    EXPECT_TRUE(ss.fail());
+}
+
+TEST_F(WeatherDataTest, TestIsJsonFunction) {
     EXPECT_TRUE(data.validateData(mock.getJson()));
 }
-
-TEST_F(WeatherDataTest, TestDataNOTInJSONFormat) { // Test fail when not in JSON
-    const std::string notJson = "This is not JSON";
-    EXPECT_FALSE(data.validateData(notJson));
-}
-
 
 // ========================================================================
 // SERVER - MQTT REQUEST AND RESPONSE
@@ -167,6 +187,29 @@ TEST_F(EmptyWeatherDataTest, TestReceiveDataFAIL) {   // Test read data FAIL
     EXPECT_FALSE(result);
 }
 
+
+// ======================================================================================
+// WEATHER DATA DEATH TESTS
+// ======================================================================================
+
+TEST_F(WeatherDataTest, DeathInvalidTopic) {
+    EXPECT_DEATH(
+    data.setData(1, "", 72, 1013.2, 45.5, 0.1, 5.4, "2025-11-18 15:45:05"),
+    ".*");
+}
+
+TEST_F(WeatherDataTest, DeathInvalidTemperature) {
+    EXPECT_DEATH(
+    data.setData(1, "device1", -9999, 1013.2, 45.5, 0.1, 5.4, "2025-11-18 15:45:05"),
+    ".*");
+}
+
+TEST_F(WeatherDataTest, DeathDataNOTInJSONFormat) { // Test fail when not in JSON
+    const std::string notJson = "This is not JSON";
+    EXPECT_DEATH(data.validateData(notJson), ".*");
+}
+
+
 // ========================================================================================
 // BROKER TESTS
 // ========================================================================================
@@ -191,7 +234,8 @@ protected:
         float pressure = 1013.2,
         float humidity = 45.5,
         float rain = 0.1,
-        float wind = 5.4
+        float wind = 5.4,
+        time_t timestamp = time(nullptr)
         ) {
         return json{
             {"device", device_id},
@@ -200,7 +244,7 @@ protected:
             {"humidity", humidity},
             {"rain", rain},
             {"wind", wind},
-            {"timestamp", time(nullptr)}
+            {"timestamp", timestamp}
         };
     }
 
@@ -280,7 +324,7 @@ TEST_F(BrokerTest, TestReceiveResponse) {
     ASSERT_TRUE(client->subscribe(topic));
 
     json sensor_data = BrokerTest::createSensorReading("device1", 72, 1013.2,
-                                                45.5, 0.1, 5.4);
+                                                45.5, 0.1, 5.4,time(nullptr));
 
     ASSERT_TRUE(client->publish(topic, sensor_data)); // Simulate sensor readings to broker
 
@@ -292,6 +336,7 @@ TEST_F(BrokerTest, TestReceiveResponseFAIL) {
     const std::string received = client->getLastMessage();
     EXPECT_EQ(received,"No data in queue!\n");
 }
+
 
 
 // =========================================================================================
@@ -314,7 +359,8 @@ protected:
     float pressure = 1013.2,
     float humidity = 45.5,
     float rain = 0.1,
-    float wind = 5.4
+    float wind = 5.4,
+    time_t timestamp = time(nullptr)
     ) {
         return json{
                     {"device", device_id},
@@ -323,7 +369,7 @@ protected:
                     {"humidity", humidity},
                     {"rain", rain},
                     {"wind", wind},
-                    {"timestamp", time(nullptr)
+                    {"timestamp", timestamp
                     }
         };
    }
@@ -423,13 +469,6 @@ TEST_F(CrowAppTest, TestGetDataMissingParams) {
 }
 
 // ======================================================================================
-// DEATH TESTS
-// ======================================================================================
-
-// TODO: Death Tests
-
-
-// ======================================================================================
 // DATABASE TESTS
 // ======================================================================================
 
@@ -481,7 +520,7 @@ TEST_F(DataBaseTest, TestDatabaseConnectionFail) {
     bool connected = bad_db.connect();
 
     EXPECT_FALSE(connected);
-    EXPECT_FALSE(bad_db.isConnected);
+    EXPECT_FALSE(bad_db.isConnected());
 }
 
 TEST_F(DataBaseTest, TestReconnect) {
@@ -503,11 +542,8 @@ TEST_F(DataBaseTest, TestDatabaseCommit) {
     ASSERT_TRUE(db->connect());
     EXPECT_TRUE(db->isConnected());
 
-    const auto now = std::chrono::system_clock::now();
-    const std::time_t timer = std::chrono::system_clock::to_time_t(now);
-
     WeatherData data;
-    data.setData(1, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4, timer);
+    data.setData(1, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4, "2025-11-18 15:45:05");
 
     const bool inserted = db->commitReading(data);
     ASSERT_TRUE(inserted) << "Failed to insert reading";
@@ -522,7 +558,7 @@ TEST_F(DataBaseTest, TestDatabaseFailNotConnected) {
 
     WeatherData data;
 
-    data.setData(1, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4, timer);
+    data.setData(1, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4, "2025-11-18 15:45:05");
 
     bool inserted = db->commitReading(data);
 
@@ -534,7 +570,7 @@ TEST_F(DataBaseTest, TestDatabaseCommitFailEmptyCommit) {
     EXPECT_TRUE(db->isConnected());
 
     WeatherData emptyData;
-    emptyData.setData(0, "", 0, 0.0, 0.0, 0.0, 0.0, time(nullptr));
+    emptyData.setData(0, "", 0, 0.0, 0.0, 0.0, 0.0, "2025-11-18 15:45:05");
 
     const bool inserted = db->commitReading(emptyData);
     ASSERT_FALSE(inserted);
@@ -546,11 +582,9 @@ TEST_F(DataBaseTest, TestDatabaseCommitFailEmptyCommit) {
 TEST_F(DataBaseTest, TestDatabaseCommitFailInvalidID) {
     ASSERT_TRUE(db->connect());
     EXPECT_TRUE(db->isConnected());
-    const auto now = std::chrono::system_clock::now();
-    const std::time_t timer = std::chrono::system_clock::to_time_t(now);
 
     WeatherData data;
-    data.setData(0, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4, timer);
+    data.setData(0, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4, "2025-11-18 15:45:05");
 
     const bool inserted = db->commitReading(data);
     ASSERT_FALSE(inserted);
@@ -567,11 +601,9 @@ TEST_F(DataBaseTest, TestDatabaseCommitFailInvalidID) {
 TEST_F(DataBaseTest, TestDatabaseQuery) {
     ASSERT_TRUE(db->connect());
     EXPECT_TRUE(db->isConnected());
-    const auto now = std::chrono::system_clock::now();
-    const std::time_t timer = std::chrono::system_clock::to_time_t(now);
-    WeatherData data;
 
-    data.setData(1, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4, timer);
+    WeatherData data;
+    data.setData(1, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4, "2025-11-18 15:45:05");
     ASSERT_TRUE(db->commitReading(data)); // TODO: finish TestDatabaseQuery
 
 

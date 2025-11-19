@@ -147,8 +147,11 @@ class WeatherDataBase {
     string db_name;
     string db_user;
     string db_pass;
+
+    bool present = false;
+    bool committed = false;
     atomic<bool> connected = false;
-    atomic<bool> committed = false;
+
 
 public:
     WeatherDataBase() = default;
@@ -163,25 +166,34 @@ public:
 
     bool connect() {
 
-        return connected;
+        return this->connected;
     }
 
     bool disconnect() {
 
-        return connected;
+        return this->connected;
     }
 
     bool isConnected() {
 
-        return connected;
+        return this->connected;
     }
 
     bool commitReading(const WeatherData & data) {
 
-         return committed;
+         return this->committed;
     }
 
-    WeatherData queryReadingByID(int i);
+    bool isPresent() const {
+
+        return this->present;
+    }
+
+    static WeatherData queryReadingByID(int i) {
+        WeatherData query;
+        return query;
+    }
+
     static void clearAllReadings() {
 
     }

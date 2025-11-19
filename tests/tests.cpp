@@ -620,6 +620,13 @@ TEST_F(DataBaseTest, TestDatabaseCommitFailInvalidID) {
 // ======================================================================================
 
 TEST_F(DataBaseTest, TestDatabaseQuery) {
+    std::string ts_str = "2025-11-18 15:45:05";
+    std::tm tm{};
+    std::istringstream ss(ts_str);
+    ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+    ASSERT_FALSE(ss.fail());
+    time_t expected_ts = std::mktime(&tm);
+
     ASSERT_TRUE(db->connect());
     EXPECT_TRUE(db->isConnected());
 
@@ -637,11 +644,12 @@ TEST_F(DataBaseTest, TestDatabaseQuery) {
     EXPECT_EQ(queriedData.getHumidity(), 45.5);
     EXPECT_EQ(queriedData.getRain(), 0.1);
     EXPECT_EQ(queriedData.getWind(), 5.4);
-    EXPECT_EQ(queriedData.getTimeStamp(), timestamp);
+    EXPECT_EQ(queriedData.getTimeStamp(), expected_ts);
 
 }
 
 TEST_F(DataBaseTest, TestDatabaseQueryByTopic) {
+    std::vector<WeatherData> results;
     ASSERT_TRUE(db->connect());
     EXPECT_TRUE(db->isConnected());
 
@@ -652,11 +660,17 @@ TEST_F(DataBaseTest, TestDatabaseQueryByTopic) {
         ASSERT_TRUE(db->commitReading(data));
     }
 
-    std::vector<WeatherData> results = db->queryReadingByID(1);
+    WeatherData result = db->queryReadingByID(1);
+    results.push_back(result);
+
 }
 
-TEST_F(DataBaseTest, TestDatabaseQueryFail) {
-    GTEST_SKIP() << "Not implemented..." << std::endl;
+TEST_F(DataBaseTest, TestQueryNotInDatabase) {
+    ASSERT_TRUE(db->connect());
+    EXPECT_TRUE(db->isConnected());
+
+    WeatherData result = db->queryReadingByID(1);
+    EXPECT_FALSE(db->isPresent());
 }
 
 

@@ -3,7 +3,6 @@
 //
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <nlohmann/json.hpp>
 #include "../src/weather_data.h"
 #include "../src/routes.h"
 #include <vector>
@@ -31,30 +30,17 @@ protected:
 
     void SetUp() override {
         std::cout << "\n=== Weather Data Test Setup ===" << std::endl;
-        chrono::system_clock::time_point time_point = std::chrono::system_clock::now();
-        std::time_t tt = std::chrono::system_clock::to_time_t(time_point);
-        string formatted_time = WeatherData::convertTime(tt);
-
-        data.setData(
-            1,
-            "device1/responses",
-            72,
-            1013.2,
-            45.5,
-            0.1,
-            5.4,
-            formatted_time
-            );
         ON_CALL(mock, getJson())
             .WillByDefault(testing::Return(
                 R"({
+                        "data_ID" : 1,
                         "topic":"device1/responses",
-                        "temp":72,
+                        "temperature":72,
                         "pressure":1013.2,
                         "humidity":45.5,
                         "rain":0.1,
                         "wind":5.4,
-                        "timestamp":{"2025-11-18 15:45:05"}
+                        "timestamp":"2025-11-18 15:45:05"
                                     })"));
     }
     void TearDown() override {
@@ -85,6 +71,23 @@ protected:
 };
 
 TEST_F(WeatherDataTest, TestSetData) { // Test data is set in class structure
+    const chrono::system_clock::time_point time_point = std::chrono::system_clock::now();
+    const std::time_t tt = std::chrono::system_clock::to_time_t(time_point);
+    const string formatted_time = WeatherData::convertTime(tt);
+    std::string timestamp_string = WeatherData::convertTime(data.getTimeStamp());
+
+    data.setData(
+    1,
+    "device1/responses",
+    72,
+    1013.2,
+    45.5,
+    0.1,
+    5.4,
+    formatted_time
+    );
+    EXPECT_TRUE(data.validateData());
+
     EXPECT_EQ(data.getDataID(), 1);
     EXPECT_EQ(data.getTopic(), "device1/responses");
     EXPECT_EQ(data.getTemperature(), 72);
@@ -92,27 +95,26 @@ TEST_F(WeatherDataTest, TestSetData) { // Test data is set in class structure
     EXPECT_FLOAT_EQ(data.getHumidity(), 45.5);
     EXPECT_FLOAT_EQ(data.getRain(), 0.1);
     EXPECT_FLOAT_EQ(data.getWind(), 5.4);
-    EXPECT_NE(data.getTimeStamp(), time(nullptr));
+    EXPECT_EQ(timestamp_string, formatted_time);
     EXPECT_GT(data.getTimeStamp(), 0);
-
-    const std::string json = mock.getJson();
-    EXPECT_TRUE(data.validateData(json));
 
 }
 
-TEST_F(EmptyWeatherDataTest, TestSetDataEMPTY) { // Test data set empty
-    EXPECT_EQ(emptyData.getDataID(), 0);
-    EXPECT_EQ(emptyData.getTopic(), "");
-    EXPECT_EQ(emptyData.getTemperature(), 0);
-    EXPECT_FLOAT_EQ(emptyData.getPressure(), 0.0);
-    EXPECT_FLOAT_EQ(emptyData.getHumidity(), 0.0);
-    EXPECT_FLOAT_EQ(emptyData.getRain(), 0.0);
-    EXPECT_FLOAT_EQ(emptyData.getWind(), 0.0);
-    EXPECT_EQ(emptyData.getTimeStamp(), time(nullptr));
-    EXPECT_EQ(emptyData.getTimeStamp(), time(nullptr));
+TEST_F(EmptyWeatherDataTest, TestSetDataINVALID) {
+    testing::internal::CaptureStderr();
+    emptyData.setData(0, "", -51, 599.99, -0.1, -0.1, -0.1, "INVALID");
+    std::string output = testing::internal::GetCapturedStderr();
 
-    const std::string json = mock.getJson();
-    EXPECT_FALSE(emptyData.validateData(json));
+    EXPECT_NE(output.find("Data ID cannot be less than 1!"), std::string::npos);
+    EXPECT_NE(output.find("Topic cannot be blank!"), std::string::npos);
+    EXPECT_NE(output.find("Temperature out of range!"), std::string::npos);
+    EXPECT_NE(output.find("Pressure out of range!"), std::string::npos);
+    EXPECT_NE(output.find("Humidity out of range!"), std::string::npos);
+    EXPECT_NE(output.find("Rain out of range!"), std::string::npos);
+    EXPECT_NE(output.find("Wind out of range!"), std::string::npos);
+    EXPECT_NE(output.find("Timestamp not valid!"), std::string::npos);
+
+    EXPECT_FALSE(emptyData.validateData());
 }
 
 TEST_F(WeatherDataTest, TestTimeStampPopulated) {
@@ -147,8 +149,23 @@ TEST_F(WeatherDataTest, TestInvalidTimeStampFormat) {
     EXPECT_TRUE(ss.fail());
 }
 
-TEST_F(WeatherDataTest, TestIsJsonFunction) {
-    EXPECT_TRUE(data.validateData(mock.getJson()));
+TEST_F(WeatherDataTest, TestValidateJson) {
+    EXPECT_TRUE(data.validateJSON(mock.getJson()));
+}
+
+TEST_F(EmptyWeatherDataTest, TestValidateJsonFAIL) {
+    testing::internal::CaptureStderr();
+    EXPECT_FALSE(emptyData.validateJSON(mock.getJson()));
+    std::string output = testing::internal::GetCapturedStderr();
+
+    EXPECT_NE(output.find("Data ID JSON invalid!"), std::string::npos);
+    EXPECT_NE(output.find("Topic JSON invalid!"), std::string::npos);
+    EXPECT_NE(output.find("Temperature JSON invalid!"), std::string::npos);
+    EXPECT_NE(output.find("Pressure JSON invalid!"), std::string::npos);
+    EXPECT_NE(output.find("Humidity JSON invalid!"), std::string::npos);
+    EXPECT_NE(output.find("Rain JSON invalid!"), std::string::npos);
+    EXPECT_NE(output.find("Wind JSON invalid!"), std::string::npos);
+    EXPECT_NE(output.find("Timestamp JSON invalid!"), std::string::npos);
 }
 
 // ========================================================================
@@ -162,7 +179,7 @@ TEST_F(WeatherDataTest, TestRequestData) {
     ASSERT_TRUE(WeatherData::requestData(request));
 
     std::string receivedData = data.receiveData();
-    EXPECT_EQ(data.validateData(receivedData), true);
+    EXPECT_EQ(data.validateJSON(receivedData), true);
 }
 
 TEST_F(WeatherDataTest, TestRequestDataFAIL) {
@@ -171,19 +188,19 @@ TEST_F(WeatherDataTest, TestRequestDataFAIL) {
     ASSERT_TRUE(WeatherData::requestData(request));
 
     std::string receivedData = data.receiveData();
-    EXPECT_NE(data.validateData(receivedData), true);
+    EXPECT_NE(data.validateJSON(receivedData), true);
 }
 
 
 TEST_F(WeatherDataTest, TestReceiveData) { // Test data can be read from /device/responses
     const string returned = data.receiveData();
-    const bool result = data.validateData(returned);
+    const bool result = data.validateJSON(returned);
     EXPECT_TRUE(result);
 }
 
 TEST_F(EmptyWeatherDataTest, TestReceiveDataFAIL) {   // Test read data FAIL
     const string returned = emptyData.receiveData();
-    const bool result = emptyData.validateData(returned);
+    const bool result = emptyData.validateJSON(returned);
     EXPECT_FALSE(result);
 }
 
@@ -206,7 +223,7 @@ TEST_F(WeatherDataTest, DeathInvalidTemperature) {
 
 TEST_F(WeatherDataTest, DeathDataNOTInJSONFormat) { // Test fail when not in JSON
     const std::string notJson = "This is not JSON";
-    EXPECT_DEATH(data.validateData(notJson), ".*");
+    EXPECT_DEATH(data.validateJSON(notJson), ".*");
 }
 
 

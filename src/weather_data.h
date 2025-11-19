@@ -12,7 +12,9 @@
 #include <iomanip>
 #include <ctime>
 #include <sstream>
+#include <nlohmann/json.hpp>
 
+using json = nlohmann::json;
 using namespace std;
 
 #ifndef WEATHER_STATION_DASHBOARD_DATA_H
@@ -46,8 +48,10 @@ public:
         timestamp = time(nullptr);
 
     }
+
     void setData(const int i, const string& top, const int temp, const float press,
-                  const float humid, const float ra, const float wi, const string &t) {
+                 const float humid, const float ra, const float wi, const string &t) {
+
         this->data_ID = i;
         this->topic = top;
         this->temperature = temp;
@@ -55,17 +59,84 @@ public:
         this->humidity = humid;
         this->rain = ra;
         this->wind = wi;
-
         // convert string t to time_t
         std::tm tm_struct = {};
         std::istringstream ss(t);
         ss >> std::get_time(&tm_struct, "%Y-%m-%d %H:%M:%S");
 
         if (ss.fail()) {
-            std::cerr << "Error parsing time string" << std::endl;
+            std::cerr << "Timestamp not valid!" << std::endl;
+            this->isValid = false;
         } else {
             this->timestamp = std::mktime(&tm_struct);
         }
+        this->isValid = validateData();
+    }
+
+
+    bool validateData() const {
+        bool validate = true;
+        if (data_ID < 1) {
+            cerr << "Data ID cannot be less than 1!" << std::endl;
+            validate = false;
+        }
+        if (topic == "") {
+            cerr << "Topic cannot be blank!" << std::endl;
+            validate = false;
+        }
+        if (temperature < -50 || temperature > 110) {
+            cerr << "Temperature out of range!" << std::endl;
+            validate = false;
+        }
+        if (pressure < 600.00 || pressure > 2000) {
+            cerr << "Pressure out of range!" << std::endl;
+            validate = false;
+        }
+        if (humidity < 0.0 || humidity > 100.0) {
+            cerr << "Humidity out of range!" << std::endl;
+            validate = false;
+        }
+        if (rain < 0.0 || rain > 100.0) {
+            cerr << "Rain out of range!" << std::endl;
+            validate = false;
+        }
+        if (wind < 0.0 || wind > 150.0) {
+            cerr << "Wind out of range!" << std::endl;
+            validate = false;
+        }
+        return validate;
+    }
+
+    static bool validateJSON(const std::string& jsonStr) {
+        json j;
+
+        try {
+            j = json::parse(jsonStr);
+        } catch (...) {
+            std::cerr << "Invalid JSON format!" << std::endl;
+            return false;
+        }
+
+        bool valid = true;
+
+
+        auto require = [&](auto field, auto check, const std::string& msg) {
+            if (!j.contains(field) || !check(j[field])) {
+                std::cerr << msg << std::endl;
+                valid = false;
+            }
+        };
+
+        require("data_ID",     [](auto x){ return x.is_number_integer(); }, "Data ID JSON invalid!");
+        require("topic",       [](auto x){ return x.is_string(); },         "Topic JSON invalid!");
+        require("temperature", [](auto x){ return x.is_number(); },         "Temperature JSON invalid!");
+        require("pressure",    [](auto x){ return x.is_number(); },         "Pressure JSON invalid!");
+        require("humidity",    [](auto x){ return x.is_number(); },         "Humidity JSON invalid!");
+        require("rain",        [](auto x){ return x.is_number(); },         "Rain JSON invalid!");
+        require("wind",        [](auto x){ return x.is_number(); },         "Wind JSON invalid!");
+        require("timestamp",   [](auto x){ return x.is_string(); },         "Timestamp JSON invalid!");
+
+        return valid;
     }
 
     void populateDataToMap() {
@@ -127,12 +198,6 @@ public:
     string receiveData() {
 
         return "No data received";
-    }
-
-
-    bool validateData(const string& data) {
-        this->isValid = false;
-        return isValid;
     }
 };
 

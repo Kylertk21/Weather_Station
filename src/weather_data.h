@@ -27,12 +27,13 @@ class WeatherData {
     float rain;
     float wind;
     time_t timestamp{};
-    std::atomic<bool> isValid{};
+    bool isValid{};
     std::unordered_map<string, string> dataMap;
-
     WeatherData process_data();
 
 public:
+    WeatherData(const WeatherData&) = default;
+    WeatherData& operator=(const WeatherData&) = default;
     WeatherData() {
         data_ID = 0;
         topic = "";
@@ -67,7 +68,7 @@ public:
         }
     }
 
-    void populateData() {
+    void populateDataToMap() {
         dataMap["data ID"] = std::to_string(data_ID);
         dataMap["topic"] = topic;
         dataMap["temperature"] = std::to_string(temperature);
@@ -180,6 +181,7 @@ public:
          return committed;
     }
 
+    WeatherData queryReadingByID(int i);
     static void clearAllReadings() {
 
     }
@@ -238,6 +240,13 @@ public:
     std::string getLastMessage() {
 
         return "No data in queue!\n";
+    }
+
+    static std::vector<WeatherData> queryReadingsByID(int id) {
+        std::vector<WeatherData> results;
+        const WeatherData wd;
+        results.push_back(wd);
+        return results;
     }
 
 

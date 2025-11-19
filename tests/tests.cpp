@@ -446,7 +446,7 @@ TEST_F(CrowAppTest, TestGetDataInJson) { // Test data retrieved from server is i
     EXPECT_GT(json_response["timestamp"].d(), 0);
 }
 
-TEST_F(CrowAppTest, TestGetNotInJson) { // TODO: finish TestNotInJson
+TEST_F(CrowAppTest, TestGetNotInJson) {
     req.url = "/";
     req.method = "GET"_method;
 
@@ -534,6 +534,13 @@ TEST_F(DataBaseTest, TestReconnect) {
     EXPECT_TRUE(db->isConnected());
 }
 
+TEST_F(DataBaseTest, TestMultipleConnections) {
+    ASSERT_TRUE(db->connect());
+    EXPECT_TRUE(db->isConnected());
+    // attempt second connect
+    EXPECT_TRUE(db->isConnected());
+}
+
 // ======================================================================================
 // DATABASE TRANSACTION TESTS
 // ======================================================================================
@@ -550,6 +557,20 @@ TEST_F(DataBaseTest, TestDatabaseCommit) {
 
     const int count = db->getDataCount("test-topic");
     EXPECT_GT(count, 0);
+}
+
+TEST_F(DataBaseTest, TestDatabaseCommitMultiple) {
+    ASSERT_TRUE(db->connect());
+    EXPECT_TRUE(db->isConnected());
+
+    for (int i = 1; i <= 5; i++) {
+        WeatherData data;
+        data.setData(1, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4, "2025-11-18 15:45:05");
+        ASSERT_TRUE(db->commitReading(data)) << "Failed to insert reading " << i;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    int count = db->getDataCount("test-topic");
+    EXPECT_EQ(count, 5);
 }
 
 TEST_F(DataBaseTest, TestDatabaseFailNotConnected) {
@@ -606,8 +627,32 @@ TEST_F(DataBaseTest, TestDatabaseQuery) {
     data.setData(1, "test-topic", 72, 1013.2, 45.5, 0.1, 5.4, "2025-11-18 15:45:05");
     ASSERT_TRUE(db->commitReading(data)); // TODO: finish TestDatabaseQuery
 
+    string timestamp = data.convertTime(*"2025-11-18 15:45:05");
+    WeatherData queriedData = db->queryReadingByID(1);
 
+    EXPECT_EQ(queriedData.getDataID(), 1);
+    EXPECT_EQ(queriedData.getTopic(), "test-topic");
+    EXPECT_EQ(queriedData.getTemperature(), 72);
+    EXPECT_EQ(queriedData.getPressure(), 1013.2);
+    EXPECT_EQ(queriedData.getHumidity(), 45.5);
+    EXPECT_EQ(queriedData.getRain(), 0.1);
+    EXPECT_EQ(queriedData.getWind(), 5.4);
+    EXPECT_EQ(queriedData.getTimeStamp(), timestamp);
 
+}
+
+TEST_F(DataBaseTest, TestDatabaseQueryByTopic) {
+    ASSERT_TRUE(db->connect());
+    EXPECT_TRUE(db->isConnected());
+
+    for (int i = 1; i <= 3; i++) {
+        WeatherData data;
+        data.setData(i, "test-topic", 70 + 1, 1013.0, 15.0, 0.1, 5.0,
+                "2025-11-18 15:45:05" + std::to_string(i));
+        ASSERT_TRUE(db->commitReading(data));
+    }
+
+    std::vector<WeatherData> results = db->queryReadingByID(1);
 }
 
 TEST_F(DataBaseTest, TestDatabaseQueryFail) {

@@ -8,10 +8,11 @@ option(BUILD_TESTS "build test suite" OFF)
 
 include_directories(
         /usr/include
+        /usr/local/include
        )
+find_library(MOSQUITTO_LIBRARY mosquitto)
+find_path(MOSQUITTO_INCLUDE_DIR mosquitto.h)
 
-# --- Crow includes ---
-include_directories(${CMAKE_SOURCE_DIR}/external/Crow/include)
 
 # --- GoogleTest via FetchContent ---
 include(FetchContent)
@@ -22,13 +23,29 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
+find_path(CROW_INCLUDE_DIR
+        crow.h
+        PATHS /usr/local/include /usr/include
+)
+
+if (NOT CROW_INCLUDE_DIR)
+    message(FATAL_ERROR "Crow not found! Install it or set CROW_INCLUDE_DIR.")
+endif()
+
+include_directories(${CROW_INCLUDE_DIR})
 # --- Main executable ---
 add_executable(Weather_Station_Dashboard
         src/main.cpp
-        src/weather_data.h
+        src/weather_data.cpp
 )
-target_link_libraries(Weather_Station_Dashboard
-)
+
+target_include_directories(Weather_Station_Dashboard PRIVATE
+        ${MOSQUITTO_INCLUDE_DIR}
+        ${CMAKE_SOURCE_DIR}/external/Crow/include)
+target_link_libraries(Weather_Station_Dashboard PRIVATE
+        ${MOSQUITTO_LIBRARY})
+target_compile_definitions(Weather_Station_Dashboard PRIVATE
+        MQTT_ENABLED=1)
 
 # --- Tests ---
 if(BUILD_TESTS)
@@ -46,14 +63,9 @@ if(BUILD_TESTS)
     endif()
 
     add_executable(runTests
-            src/weather_data.h
-            tests/tests.cpp
-            tests/tests.cpp
+            src/weather_data.cpp
             tests/tests.cpp
     )
-    target_include_directories(runTests PRIVATE
-            ${CMAKE_SOURCE_DIR}/external/Crow/include
-            )
     target_link_libraries(runTests
             PRIVATE
             GTest::gtest
@@ -61,11 +73,14 @@ if(BUILD_TESTS)
             GTest::gmock
             GTest::gmock_main
     )
-    # Only add Mosquitto if found (for integration tests)
     if(MOSQUITTO_FOUND)
-        target_include_directories(runTests PRIVATE ${MOSQUITTO_INCLUDE_DIR})
-        target_link_libraries(runTests PRIVATE ${MOSQUITTO_LIBRARY})
-        target_compile_definitions(runTests PRIVATE MQTT_ENABLED=1)
+        target_include_directories(runTests PRIVATE
+                ${MOSQUITTO_INCLUDE_DIR}
+                ${CROW_INCLUDE_DIR})
+        target_link_libraries(runTests PRIVATE
+                ${MOSQUITTO_LIBRARY})
+        target_compile_definitions(runTests PRIVATE
+                MQTT_ENABLED=1)
     endif()
 
     include(GoogleTest)

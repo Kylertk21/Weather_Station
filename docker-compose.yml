@@ -10,13 +10,16 @@ services:
     ports:
       - "18080:18080"
     volumes:
+      - .:/app
       - ./src:/app/src
       - ./include:/app/include
-      - ./CMakeLists.txt:/app/CMakeLists.txt
     restart: unless-stopped
     stdin_open: true
     tty: true
     command: bash -c "
+      if [ ! -d external/Crow ]; then
+      mkdir -p external && git clone --depth=1 https://github.com/CrowCpp/Crow.git external/Crow;
+      fi &&
       rm -rf build_app &&
       cmake -S . -B build_app &&
       cmake --build build_app --target Weather_Station_Dashboard &&
@@ -50,10 +53,10 @@ services:
         ./build/runTests --gtest_color=yes --gtest_brief=0
       "
     volumes:
+      - .:/app
       - ./src:/app/src
       - ./include:/app/include
       - ./tests:/app/tests
-      - ./CMakeLists.txt:/app/CMakeLists.txt
     networks:
       - weather_station_network
 

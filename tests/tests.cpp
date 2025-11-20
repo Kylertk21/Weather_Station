@@ -173,7 +173,6 @@ TEST_F(EmptyWeatherDataTest, TestValidateJsonFAIL) {
 // ========================================================================
 
 TEST_F(WeatherDataTest, TestRequestData) {
-    MQTT_Client client("test");
     const std::string request = "request update";
     ASSERT_TRUE(WeatherData::connectBroker());
     ASSERT_TRUE(WeatherData::requestData(request));
@@ -231,13 +230,69 @@ TEST_F(WeatherDataTest, DeathDataNOTInJSONFormat) { // Test fail when not in JSO
 // BROKER TESTS
 // ========================================================================================
 
+
+class MQTT_Test_Client {
+    struct mosquitto *client = nullptr;
+    std::string broker_host;
+    int broker_port = 0;
+    atomic<bool> connected{false};
+    std::atomic<bool> message_received{false};
+    std::vector<std::string> received_messages;
+    std::string client_id;
+
+public:
+    MQTT_Test_Client() = default;
+    explicit MQTT_Test_Client(const char * str) : client_id(str) {
+        const char* host_env = std::getenv("MQTT_BROKER_HOST");
+        broker_host = host_env ? host_env : "mqtt-broker";
+
+        const char* port_env = std::getenv("MQTT_BROKER_PORT");
+        broker_port = port_env ? std::stoi(port_env) : 1883;
+
+        std::cout << "[MQTT] Client Configured For: " << broker_host
+                  << ":" << broker_port << std::endl;
+    }
+
+    bool connect() {
+
+        return false;
+    }
+    bool disconnect() {
+
+        return false;
+    }
+    bool isConnected() {
+        return connected;
+    }
+    bool publish(const std::string topic, std::string payload) {
+
+        return false;
+    }
+    bool subscribe(std::string topic) {
+
+        return false;
+    }
+    std::string getLastMessage() {
+
+        return "No data in queue!\n";
+    }
+
+    static std::vector<WeatherData> queryReadingsByID(int id) {
+        std::vector<WeatherData> results;
+        const WeatherData wd;
+        results.push_back(wd);
+        return results;
+    }
+
+};
+
 class BrokerTest : public testing::Test {
 protected:
-    MQTT_Client *client = nullptr;
+    MQTT_Test_Client *client = nullptr;
 
     void SetUp() override {
         std::cout << "\n=== MQTT Integration Test Setup ===" << std::endl;
-        client = new MQTT_Client("test-client");
+        client = new MQTT_Test_Client("test-client");
 
         ASSERT_TRUE(client->connect())
             << "Failed to connect to MQTT Broker";
@@ -279,7 +334,7 @@ protected:
 
 
 // ========================================================================================
-// TEST CONNECTION
+// TEST CONNECTION - MQTT_TEST_CLIENT
 // ========================================================================================
 
 TEST_F(BrokerTest, TestConnect) {

@@ -23,6 +23,7 @@ RUN git clone --depth=1 https://github.com/CrowCpp/Crow.git /tmp/crow && \
 
 WORKDIR /app
 COPY . /app
+COPY external/Crow /app/external/Crow
 
 RUN mkdir -p external/gtest && \
     git clone --depth=1 https://github.com/google/googletest.git external/gtest
@@ -41,7 +42,9 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     libssl-dev \
     libasio-dev \
-    nlohmann-json3-dev && \
+    nlohmann-json3-dev \
+    libmosquitto-dev \
+    mosquitto-clients &&\
     rm -rf /var/lib/apt/lists/*
 
 
@@ -49,6 +52,7 @@ WORKDIR /app
 
 COPY --from=builder /app/build/Weather_Station_Dashboard .
 COPY --from=builder /app/src/templates ./templates
+COPY --from=builder /usr/local/include /usr/local/include
 
 EXPOSE 18080
 

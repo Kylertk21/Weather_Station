@@ -4,6 +4,7 @@
 
 #include "weather_data.h"
 
+
 std::atomic<bool> WeatherData::brokerConnected{false};
 std::atomic<bool> WeatherData::messageReady{false};
 std::string WeatherData::lastReceivedMessage{};

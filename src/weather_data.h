@@ -14,6 +14,7 @@
 #include <sstream>
 #include <nlohmann/json.hpp>
 #include <mosquitto.h>
+#include <bits/this_thread_sleep.h>
 
 using json = nlohmann::json;
 using namespace std;
@@ -32,12 +33,14 @@ class WeatherData {
     time_t timestamp{};
     bool isValid{};
     std::unordered_map<string, string> dataMap;
+
     WeatherData process_data();
 
     static struct mosquitto* mqttClient;
     static std::atomic<bool> brokerConnected;
     static std::string lastReceivedMessage;
     static std::atomic<bool> messageReady;
+    static std::atomic<bool> messageReceived;
 
 
     static void onConnectCallback(mosquitto *mosq, void *obj, int rc) {
@@ -237,12 +240,30 @@ public:
         return brokerConnected;
     }
 
+    static bool waitForMessage(const int timeout_ms = 5000) {
+        messageReceived = false;
+        const auto start = std::chrono::steady_clock::now();
+
+        while (!messageReceived) {
+            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start
+                ).count();
+
+            if (elapsed > timeout_ms) {
+                std::cerr << "[MQTT_Client] Timeout waiting for message" << std::endl;
+                return false;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        return true;
+    }
+
     static bool requestData(const string& request) {
 
         return false;
     }
 
-    string receiveData() {
+    string receiveData(int waitTime) {
 
         return "No data received";
     }

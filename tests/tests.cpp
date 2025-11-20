@@ -1,11 +1,14 @@
 //
 // Created by kylerk on 11/10/2025.
 //
+#include <atomic>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include "../src/weather_data.h"
 #include "../src/routes.h"
+#include "../tests/tests.h"
 #include <vector>
+
 using json = nlohmann::json;
 
 class IJsonProvider {
@@ -168,42 +171,6 @@ TEST_F(EmptyWeatherDataTest, TestValidateJsonFAIL) {
     EXPECT_NE(output.find("Timestamp JSON invalid!"), std::string::npos);
 }
 
-// ========================================================================
-// SERVER - MQTT REQUEST AND RESPONSE
-// ========================================================================
-
-TEST_F(WeatherDataTest, TestRequestData) {
-    const std::string request = "request update";
-    ASSERT_TRUE(WeatherData::connectBroker());
-    ASSERT_TRUE(WeatherData::requestData(request));
-
-    std::string receivedData = data.receiveData();
-    EXPECT_EQ(data.validateJSON(receivedData), true);
-}
-
-TEST_F(WeatherDataTest, TestRequestDataFAIL) {
-    const std::string request = "request update";
-    ASSERT_TRUE(WeatherData::connectBroker());
-    ASSERT_TRUE(WeatherData::requestData(request));
-
-    std::string receivedData = data.receiveData();
-    EXPECT_NE(data.validateJSON(receivedData), true);
-}
-
-
-TEST_F(WeatherDataTest, TestReceiveData) { // Test data can be read from /device/responses
-    const string returned = data.receiveData();
-    const bool result = data.validateJSON(returned);
-    EXPECT_TRUE(result);
-}
-
-TEST_F(EmptyWeatherDataTest, TestReceiveDataFAIL) {   // Test read data FAIL
-    const string returned = emptyData.receiveData();
-    const bool result = emptyData.validateJSON(returned);
-    EXPECT_FALSE(result);
-}
-
-
 // ======================================================================================
 // WEATHER DATA DEATH TESTS
 // ======================================================================================
@@ -231,72 +198,29 @@ TEST_F(WeatherDataTest, DeathDataNOTInJSONFormat) { // Test fail when not in JSO
 // ========================================================================================
 
 
-class MQTT_Test_Client {
-    struct mosquitto *client = nullptr;
-    std::string broker_host;
-    int broker_port = 0;
-    atomic<bool> connected{false};
-    std::atomic<bool> message_received{false};
-    std::vector<std::string> received_messages;
-    std::string client_id;
+// EXE definitions for linker
+std::string MQTT_Test_Client::lastReceivedMessage{};
+mosquitto* MQTT_Test_Client::mqttClient = nullptr;
 
-public:
-    MQTT_Test_Client() = default;
-    explicit MQTT_Test_Client(const char * str) : client_id(str) {
-        const char* host_env = std::getenv("MQTT_BROKER_HOST");
-        broker_host = host_env ? host_env : "mqtt-broker";
-
-        const char* port_env = std::getenv("MQTT_BROKER_PORT");
-        broker_port = port_env ? std::stoi(port_env) : 1883;
-
-        std::cout << "[MQTT] Client Configured For: " << broker_host
-                  << ":" << broker_port << std::endl;
-    }
-
-    bool connect() {
-
-        return false;
-    }
-    bool disconnect() {
-
-        return false;
-    }
-    bool isConnected() {
-        return connected;
-    }
-    bool publish(const std::string topic, std::string payload) {
-
-        return false;
-    }
-    bool subscribe(std::string topic) {
-
-        return false;
-    }
-    std::string getLastMessage() {
-
-        return "No data in queue!\n";
-    }
-
-    static std::vector<WeatherData> queryReadingsByID(int id) {
-        std::vector<WeatherData> results;
-        const WeatherData wd;
-        results.push_back(wd);
-        return results;
-    }
-
-};
+std::atomic<bool> MQTT_Test_Client::brokerConnected{false};
+std::atomic<bool> MQTT_Test_Client::messageReady{false};
+std::atomic<bool> MQTT_Test_Client::messageReceived{false};
 
 class BrokerTest : public testing::Test {
 protected:
-    MQTT_Test_Client *client = nullptr;
+    MQTT_Test_Client *gateway_simulator = nullptr;
+    WeatherData data = WeatherData();
 
     void SetUp() override {
         std::cout << "\n=== MQTT Integration Test Setup ===" << std::endl;
-        client = new MQTT_Test_Client("test-client");
+        gateway_simulator = new MQTT_Test_Client("test-client");
 
-        ASSERT_TRUE(client->connect())
+        ASSERT_TRUE(gateway_simulator->connectBroker())
             << "Failed to connect to MQTT Broker";
 
+        ASSERT_TRUE(gateway_simulator->subscribe("device1/requests"));
+
+        std::cout << "[TEST] Gateway Simulator Ready" << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
@@ -308,8 +232,9 @@ protected:
         float rain = 0.1,
         float wind = 5.4,
         time_t timestamp = time(nullptr)
-        ) {
-        return json{
+        ){
+
+        json sensor_data = json{
             {"device", device_id},
             {"temp", temp},
             {"pressure", pressure},
@@ -318,19 +243,79 @@ protected:
             {"wind", wind},
             {"timestamp", timestamp}
         };
+        return sensor_data;
     }
 
+    void simulateValidResponse() const {
+        const json sensor_data = createSensorReading();
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        gateway_simulator->publish("device1/responses", sensor_data.dump());
+    }
 
+    void simulateInvalidResponse() const {
+        std::string bad_data = "NOT JSON!! NOT JSON!!";
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        gateway_simulator->publish("device1/responses", bad_data);
+    }
+
+    void simulateIncompleteResponse() const {
+        json incomplete = {
+            {"device", 1}
+        };
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        gateway_simulator->publish("device1/responses", incomplete.dump());
+    }
 
     void TearDown() override {
-        if (client) {
-            client->disconnect();
-            delete client;
-            client = nullptr;
+        if (gateway_simulator) {
+            gateway_simulator->disconnectBroker();
+            delete gateway_simulator;
+            gateway_simulator = nullptr;
         }
         std::cout << "=== MQTT Integration Test Complete ===\n" << std::endl;
     }
 };
+
+// ========================================================================
+// SERVER - MQTT REQUEST AND RESPONSE
+// ========================================================================
+
+TEST_F(BrokerTest, TestRequestData) {
+    ASSERT_TRUE(WeatherData::connectBroker()) << "Failed to connect to broker";
+
+    const std::string request = "[REQUEST] update";
+    ASSERT_TRUE(WeatherData::requestData(request)) << "Failed to send request";
+
+    ASSERT_TRUE(gateway_simulator->waitForMessage(2000))
+        << "Gateway did not receive request";
+
+    std::string received_request = gateway_simulator->getLastMessage();
+    json request_json = json::parse(received_request);
+    EXPECT_EQ(request_json["command"], "[REQUEST] update");
+
+    simulateValidResponse();
+
+    std::string receivedData = data.receiveData(3000);
+
+    ASSERT_FALSE(receivedData.empty()) << "No data received";
+    EXPECT_TRUE(data.validateJSON(receivedData)) << "Received data is not valid JSON";
+}
+
+TEST_F(BrokerTest, TestRequestDataFAIL) {
+    const std::string request = "request update";
+    ASSERT_TRUE(WeatherData::connectBroker());
+    ASSERT_TRUE(WeatherData::requestData(request));
+
+    std::string receivedData = data.receiveData(3000);
+    EXPECT_NE(data.validateJSON(receivedData), true);
+}
+
+
+TEST_F(BrokerTest, TestReceiveData) { // Test data can be read from /device/responses
+    const string returned = data.receiveData(3000);
+    const bool result = data.validateJSON(returned);
+    EXPECT_TRUE(result);
+}
 
 
 // ========================================================================================
@@ -338,23 +323,23 @@ protected:
 // ========================================================================================
 
 TEST_F(BrokerTest, TestConnect) {
-    client->connect();
-    EXPECT_TRUE(client->isConnected());
+    gateway_simulator->connectBroker();
+    EXPECT_TRUE(gateway_simulator->isConnected());
 }
 
 TEST_F(BrokerTest, TestConnectFail) {
-    client->disconnect();
-    EXPECT_FALSE(client->isConnected());
+    gateway_simulator->disconnectBroker();
+    EXPECT_FALSE(gateway_simulator->isConnected());
 }
 
 TEST_F(BrokerTest, TestDisconnect) {
-    client->disconnect();
-    EXPECT_TRUE(client->disconnect());
+    gateway_simulator->disconnectBroker();
+    EXPECT_TRUE(gateway_simulator->disconnectBroker());
 }
 
 TEST_F(BrokerTest, TestDisconnectFail) {
-    client->disconnect();
-    EXPECT_FALSE(client->disconnect());
+    gateway_simulator->disconnectBroker();
+    EXPECT_FALSE(gateway_simulator->disconnectBroker());
 }
 
 // ========================================================================================
@@ -364,14 +349,14 @@ TEST_F(BrokerTest, TestDisconnectFail) {
 TEST_F(BrokerTest, TestSubscribeToTopic) {
     const std::string topic = "test/device1/responses";
 
-    bool result = client->subscribe(topic);
+    bool result = gateway_simulator->subscribe(topic);
     EXPECT_TRUE(result);
 }
 
 TEST_F(BrokerTest, TestSubscribeToTopicFAIL) {
     const std::string topic = "";
 
-    bool result = client->subscribe(topic);
+    bool result = gateway_simulator->subscribe(topic);
     EXPECT_FALSE(result);
 }
 
@@ -379,7 +364,7 @@ TEST_F(BrokerTest, TestPublishMessage) {
     const std::string topic = "test/device1/requests";
     const std::string payload ="Request POLL";
 
-    bool result = client->publish(topic, payload);
+    bool result = gateway_simulator->publish(topic, payload);
     EXPECT_TRUE(result);
 }
 
@@ -387,25 +372,25 @@ TEST_F(BrokerTest, TestPublishMessageFAIL) {
     const std::string topic = "test/device1/requests";
     const std::string payload ="";
 
-    bool result = client->publish(topic, payload);
+    bool result = gateway_simulator->publish(topic, payload);
     EXPECT_FALSE(result);
 }
 
 TEST_F(BrokerTest, TestReceiveResponse) {
     const std::string topic = "test/device1/responses";
-    ASSERT_TRUE(client->subscribe(topic));
+    ASSERT_TRUE(gateway_simulator->subscribe(topic));
 
     json sensor_data = BrokerTest::createSensorReading("device1", 72, 1013.2,
                                                 45.5, 0.1, 5.4,time(nullptr));
 
-    ASSERT_TRUE(client->publish(topic, sensor_data)); // Simulate sensor readings to broker
+    ASSERT_TRUE(gateway_simulator->publish(topic, sensor_data)); // Simulate sensor readings to broker
 
-    const std::string received = client->getLastMessage();
+    const std::string received = gateway_simulator->getLastMessage();
     EXPECT_NE(received,"No data in queue!\n");
 }
 
 TEST_F(BrokerTest, TestReceiveResponseFAIL) {
-    const std::string received = client->getLastMessage();
+    const std::string received = gateway_simulator->getLastMessage();
     EXPECT_EQ(received,"No data in queue!\n");
 }
 

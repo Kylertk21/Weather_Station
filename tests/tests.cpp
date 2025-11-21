@@ -33,6 +33,20 @@ protected:
 
     void SetUp() override {
         std::cout << "\n=== Weather Data Test Setup ===" << std::endl;
+        const chrono::system_clock::time_point time_point = std::chrono::system_clock::now();
+        const std::time_t tt = std::chrono::system_clock::to_time_t(time_point);
+        const string formatted_time = WeatherData::convertTime(tt);
+        data.setData(
+        1,
+        "device1/responses",
+        72,
+        1013.2,
+        45.5,
+        0.1,
+        5.4,
+        formatted_time
+        );
+
         ON_CALL(mock, getJson())
             .WillByDefault(testing::Return(
                 R"({
@@ -79,18 +93,7 @@ TEST_F(WeatherDataTest, TestSetData) { // Test data is set in class structure
     const string formatted_time = WeatherData::convertTime(tt);
     std::string timestamp_string = WeatherData::convertTime(data.getTimeStamp());
 
-    data.setData(
-    1,
-    "device1/responses",
-    72,
-    1013.2,
-    45.5,
-    0.1,
-    5.4,
-    formatted_time
-    );
     EXPECT_TRUE(data.validateData());
-
     EXPECT_EQ(data.getDataID(), 1);
     EXPECT_EQ(data.getTopic(), "device1/responses");
     EXPECT_EQ(data.getTemperature(), 72);

@@ -14,7 +14,11 @@
 #include <sstream>
 #include <nlohmann/json.hpp>
 #include <mosquitto.h>
+#include <asio/connect.hpp>
 #include <bits/this_thread_sleep.h>
+#include <sys/wait.h>
+
+#include "mqtt_client_class.h"
 
 using json = nlohmann::json;
 using namespace std;
@@ -35,34 +39,6 @@ class WeatherData {
     std::unordered_map<string, string> dataMap;
 
     WeatherData process_data();
-
-    static struct mosquitto* mqttClient;
-    static std::atomic<bool> brokerConnected;
-    static std::string lastReceivedMessage;
-    static std::atomic<bool> messageReady;
-    static std::atomic<bool> messageReceived;
-
-
-    static void onConnectCallback(mosquitto *mosq, void *obj, int rc) {
-        if (rc == 0) {
-            brokerConnected = true;
-            std::cout << "[WeatherData] Connected to broker" << std::endl;
-
-            mosquitto_subscribe(mosq, nullptr, "device1/responses", 0);
-        } else {
-            brokerConnected = false;
-            std::cerr << "[WeatherData] Connection faled: " << rc << std::endl;
-        }
-    }
-
-    static void onMessageCallback(struct mosquitto *mosq, void *obj,
-                                    const struct mosquitto_message *message) {
-
-        std::string msg(static_cast<char*>(message->payload), message->payloadlen);
-        lastReceivedMessage = msg;
-        messageReady = true;
-        std::cout << "[WeatherData] Received: " << msg << std::endl;
-    }
 
 public:
     WeatherData() :
@@ -205,75 +181,48 @@ public:
         oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
         return oss.str();
     }
+};
 
-    static bool connectBroker() {
-        if (brokerConnected) {
-            std::cout << "[WeatherData] Already Connected" << std::endl;
-            return true;
-        }
+// ========================================================================================
+// Weather MQTT Client
+// ========================================================================================
 
-        const char* hostEnv = std::getenv("MQTT_BROKER_HOST");
-        std::string brokerHost = hostEnv ? hostEnv : "mqtt-broker";
+class MQTTServerClient : MQTTClientBase {
 
-        const char* portEnv = std::getenv("MQTT_BROKER_PORT");
-        int brokerPort = portEnv ? std::stoi(portEnv) : 1883;
+    MQTTServerClient(const char *name)
+        : MQTTClientBase(name) {}
 
-        mosquitto_lib_init();
-
-        mqttClient = mosquitto_new("weather-data-client", true, nullptr); // delete messages and sessions on disconnect
-        if (!mqttClient) {
-            std::cerr << "[WeatherData] failed to create client" << std::endl;
-            return false;
-        }
-
-        mosquitto_connect_callback_set(mqttClient, onConnectCallback);
-        // Callback function: instance, user data, return code, called when connected to broker
-
-        mosquitto_message_callback_set(mqttClient, onMessageCallback);
-        // Callback function: instance, user data, message data, called when message received from broker
-
-        int rc = mosquitto_connect(mqttClient, brokerHost.c_str(), brokerPort, 60);
-        if (rc != MOSQ_ERR_SUCCESS) {
-            std::cerr << "[WeatherData] Connect failed with: " << mosquitto_strerror(rc) << std::endl;
-            return false;
-        }
-        return brokerConnected;
+    bool start() {
+        return connectBroker("server-client");
     }
 
-    static bool waitForMessage(const int timeout_ms = 5000) {
-        messageReceived = false;
-        const auto start = std::chrono::steady_clock::now();
-
-        while (!messageReceived) {
-            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now() - start
-                ).count();
-
-            if (elapsed > timeout_ms) {
-                std::cerr << "[MQTT_Client] Timeout waiting for message" << std::endl;
+    bool requestData(const std::string& topic, const std::string& payload) {
+        if (!isConnected()) {
+            try {
+                connectBroker("server-client");
+            } catch (...) {
+                cerr << "Failed to connect to broker!" << std::endl;
                 return false;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-        return true;
-    }
+            }
+        subscribe("device1/responses");
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        publish("device1/requests", "[SERVER] request update");
+        waitForMessage();
 
-    static bool requestData(const string& request) {
-
-        return false;
-    }
-
-    string receiveData(int waitTime) {
-
-        return "No data received";
     }
 };
+
+
+
+
+
 
 // ========================================================================================
 // Weather Database
 // ========================================================================================
 
-class WeatherDataBase {
+class WeatherDatabase {
     string host;
     int port{};
     int dataCount{};
@@ -287,8 +236,8 @@ class WeatherDataBase {
 
 
 public:
-    WeatherDataBase() = default;
-    WeatherDataBase(const char * h, int pt, const char * n, const char * u, const char * ps) : port(5432) {
+    WeatherDatabase() = default;
+    WeatherDatabase(const char * h, int pt, const char * n, const char * u, const char * ps) : port(5432) {
         host = h;
         port = pt;
         dataCount = 0;
@@ -312,12 +261,12 @@ public:
         return this->connected;
     }
 
-    bool commitReading(const WeatherData & data) {
+    bool commitReading(const WeatherData & data) const {
 
          return this->committed;
     }
 
-    bool isPresent() const {
+    [[nodiscard]] bool isPresent() const {
 
         return this->present;
     }

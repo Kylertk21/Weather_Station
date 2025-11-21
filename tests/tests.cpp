@@ -202,29 +202,31 @@ TEST_F(WeatherDataTest, DeathDataNOTInJSONFormat) { // Test fail when not in JSO
 
 
 // EXE definitions for linker
-std::string MQTT_Test_Client::lastReceivedMessage{};
-mosquitto* MQTT_Test_Client::mqttClient = nullptr;
+std::string MQTTGatewayClient::lastReceivedMessage{};
+mosquitto* MQTTGatewayClient::mqttClient = nullptr;
 
-std::atomic<bool> MQTT_Test_Client::brokerConnected{false};
-std::atomic<bool> MQTT_Test_Client::messageReady{false};
-std::atomic<bool> MQTT_Test_Client::messageReceived{false};
+std::atomic<bool> MQTTGatewayClient::brokerConnected{false};
+std::atomic<bool> MQTTGatewayClient::messageReady{false};
+std::atomic<bool> MQTTGatewayClient::messageReceived{false};
 
 class BrokerTest : public testing::Test {
 protected:
-    MQTT_Test_Client *gateway_simulator = nullptr;
+    MQTTGatewayClient *gateway_simulator = nullptr;
+    WeatherData *server_simulator = nullptr;
     WeatherData data = WeatherData();
 
     void SetUp() override {
         std::cout << "\n=== MQTT Integration Test Setup ===" << std::endl;
-        gateway_simulator = new MQTT_Test_Client("test-client");
-
-        ASSERT_TRUE(gateway_simulator->connectBroker())
+        gateway_simulator = new MQTTGatewayClient("test-client");
+        ASSERT_TRUE(gateway_simulator->connectBroker("test-gateway-client"))
             << "Failed to connect to MQTT Broker";
-
         ASSERT_TRUE(gateway_simulator->subscribe("device1/requests"));
 
         std::cout << "[TEST] Gateway Simulator Ready" << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        server_simulator = new WeatherData()
+
     }
 
     static json createSensorReading(
@@ -283,8 +285,8 @@ protected:
 // SERVER - MQTT REQUEST AND RESPONSE
 // ========================================================================
 
-TEST_F(BrokerTest, TestRequestData) {
-    ASSERT_TRUE(WeatherData::connectBroker()) << "Failed to connect to broker";
+TEST_F(BrokerTest, TestServerRequestData) {
+    ASSERT_TRUE(WeatherData::connectBroker("server-test-client")) << "Failed to connect to broker";
 
     const std::string request = "[REQUEST] update";
     ASSERT_TRUE(WeatherData::requestData(request)) << "Failed to send request";

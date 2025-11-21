@@ -304,20 +304,70 @@ TEST_F(BrokerTest, TestRequestData) {
     EXPECT_TRUE(data.validateJSON(receivedData)) << "Received data is not valid JSON";
 }
 
-TEST_F(BrokerTest, TestRequestDataFAIL) {
-    const std::string request = "request update";
-    ASSERT_TRUE(WeatherData::connectBroker());
-    ASSERT_TRUE(WeatherData::requestData(request));
+TEST_F(BrokerTest, TestInvalidRequestData) {
+    ASSERT_TRUE(WeatherData::connectBroker()) << "Failed to connect to broker";
+
+    const std::string request = "THIS REQUEST IS INVALID";
+    ASSERT_TRUE(WeatherData::requestData(request)) << "Failed to send request";
+
+    ASSERT_TRUE(gateway_simulator->waitForMessage(2000))
+        << "Gateway did not receive request";
 
     std::string receivedData = data.receiveData(3000);
-    EXPECT_NE(data.validateJSON(receivedData), true);
+
+    ASSERT_FALSE(receivedData.empty()) << "No data received";
+    EXPECT_FALSE(data.validateJSON(receivedData)) << "Invalid request passed check!";
+    EXPECT_EQ(receivedData, "[ERR] Invalid Request");
+
+}
+
+TEST_F(BrokerTest, TestResponseDataFAIL) {
+    ASSERT_TRUE(WeatherData::connectBroker()) << "Failed to connect to broker";
+
+    const std::string request = "[REQUEST] update";
+    ASSERT_TRUE(WeatherData::requestData(request)) << "Failed to send request";
+
+    ASSERT_TRUE(gateway_simulator->waitForMessage(2000));
+
+    simulateInvalidResponse();
+
+    std::string receivedData = data.receiveData(3000);
+
+    ASSERT_FALSE(receivedData.empty()) << "No data received";
+    EXPECT_FALSE(data.validateJSON(receivedData)) << "Invalid JSON passed check!";
+}
+
+TEST_F(BrokerTest, TestResponseDataIncomplete) {
+    ASSERT_TRUE(WeatherData::connectBroker()) << "Failed to connect to broker";
+
+    const std::string request = "[REQUEST] update";
+    ASSERT_TRUE(gateway_simulator->waitForMessage(2000));
+
+    simulateIncompleteResponse();
+
+    std::string receivedData = data.receiveData(3000);
+
+    ASSERT_FALSE(receivedData.empty()) << "No data received";
+    EXPECT_FALSE(data.validateJSON(receivedData)) <<"Incomplete JSON passed check!";
 }
 
 
-TEST_F(BrokerTest, TestReceiveData) { // Test data can be read from /device/responses
-    const string returned = data.receiveData(3000);
-    const bool result = data.validateJSON(returned);
-    EXPECT_TRUE(result);
+TEST_F(BrokerTest, TestRequestDataMultiple) {
+    ASSERT_TRUE(WeatherData::connectBroker());
+
+    for (int i = 0; i < 3; i++) {
+        std::cout << "[TEST] Request Cycle " << (i + 1) << std::endl;
+
+        ASSERT_TRUE(WeatherData::requestData("[REQUEST] update"));
+        ASSERT_TRUE(gateway_simulator->waitForMessage(2000));
+
+        simulateValidResponse();
+
+        std::string receivedData = data.receiveData(3000);
+        EXPECT_TRUE(data.validateJSON(receivedData));
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
 }
 
 

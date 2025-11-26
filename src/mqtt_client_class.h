@@ -8,88 +8,88 @@
 #define MQTT_CLIENT_CLASS_H
 
 class MQTTClientBase {
-    std::string broker_host;
-    int broker_port = 0;
-    std::atomic<bool> message_received{false};
-    std::vector<std::string> received_messages;
+    struct mosquitto *mqtt_client = nullptr;
+    std::string brokerHost;
+    int brokerPort = 0;
     std::string client_id;
-
-    static std::atomic<bool> brokerConnected;
-    static std::string lastReceivedMessage;
-    static std::atomic<bool> messageReady;
-    static std::atomic<bool> messageReceived;
+    std::vector<std::string> receivedMessages;
+    std::atomic<bool> messageReceived{false};
+    std::atomic<bool> connected{false};
 
 
     static void onConnectCallback(mosquitto *mosq, void *obj, int rc) {
+        auto *client = static_cast<MQTTClientBase*>(obj);
         if (rc == 0) {
-            brokerConnected = true;
+            client->connected = true;
             std::cout << "[WeatherData] Connected to broker" << std::endl;
 
             mosquitto_subscribe(mosq, nullptr, "device1/responses", 0);
         } else {
-            brokerConnected = false;
+            client->connected = false;
             std::cerr << "[WeatherData] Connection failed: " << rc << std::endl;
         }
     }
 
     static void onMessageCallback(struct mosquitto *mosq, void *obj,
                                     const struct mosquitto_message *message) {
+        auto *client = static_cast<MQTTClientBase*>(obj);
 
         std::string msg(static_cast<char*>(message->payload), message->payloadlen);
-        lastReceivedMessage = msg;
-        messageReady = true;
+        client->receivedMessages.push_back(msg);
+        client->messageReceived = true;
         std::cout << "[WeatherData] Received: " << msg << std::endl;
     }
 
 public:
-    static struct mosquitto* mqttClient;
-    virtual ~MQTTClientBase() = default;
+    virtual ~MQTTClientBase() {
+        disconnectBroker();
+    }
     explicit MQTTClientBase(const char * str) : client_id(str) {
         const char* host_env = std::getenv("MQTT_BROKER_HOST");
-        broker_host = host_env ? host_env : "mqtt-broker";
+        brokerHost = host_env ? host_env : "mqtt-broker";
 
         const char* port_env = std::getenv("MQTT_BROKER_PORT");
-        broker_port = port_env ? std::stoi(port_env) : 1883;
+        brokerPort = port_env ? std::stoi(port_env) : 1883;
 
-        std::cout << "[MQTT] Client Configured For: " << broker_host
-                  << ":" << broker_port << std::endl;
+        std::cout << "[MQTT] Client Configured For: " << brokerHost
+                  << ":" << brokerPort << std::endl;
     }
 
-    static bool connectBroker(const std::string &clientName) {
-        if (brokerConnected) {
-            std::cout << "[WeatherData] Already Connected" << std::endl;
+    virtual bool connectBroker(const std::string &clientName, void *obj) {
+        if (connected) {
+            std::cout << "[MQTT:" << client_id << "] Already connected" << std::endl;
             return true;
         }
 
-        const char* hostEnv = std::getenv("MQTT_BROKER_HOST");
-        std::string brokerHost = hostEnv ? hostEnv : "mqtt-broker";
-
-        const char* portEnv = std::getenv("MQTT_BROKER_PORT");
-        int brokerPort = portEnv ? std::stoi(portEnv) : 1883;
-
         mosquitto_lib_init();
 
-        mqttClient = mosquitto_new(clientName.c_str(), true, nullptr); // delete messages and sessions on disconnect
-        if (!mqttClient) {
-            std::cerr << "[WeatherData] failed to create client" << std::endl;
+        mqtt_client = mosquitto_new(client_id.c_str(), true, this);
+        if (!mqtt_client) {
+            std::cerr << "[MQTT:" << client_id << "] Failed to create client" << std::endl;
             return false;
         }
 
-        mosquitto_connect_callback_set(mqttClient, onConnectCallback);
-        // Callback function: instance, user data, return code, called when connected to broker
+        mosquitto_connect_callback_set(mqtt_client, onConnectCallback);
+        mosquitto_message_callback_set(mqtt_client, onMessageCallback);
 
-        mosquitto_message_callback_set(mqttClient, onMessageCallback);
-        // Callback function: instance, user data, message data, called when message received from broker
-
-        int rc = mosquitto_connect(mqttClient, brokerHost.c_str(), brokerPort, 60);
-        if (rc != MOSQ_ERR_SUCCESS) {
-            std::cerr << "[WeatherData] Connect failed with: " << mosquitto_strerror(rc) << std::endl;
+        int rc = mosquitto_connect(mqtt_client, brokerHost.c_str(), brokerPort, 60);
+        if (rc != MOSQ_ERR_SUCCESS)
+        {
+            std::cerr << "[MQTT:" << client_id << "] Connect failed: "
+            << mosquitto_strerror(rc) << std::endl;
             return false;
         }
-        return brokerConnected;
+
+        mosquitto_loop_start(mqtt_client);
+
+        for (int i = 0; i < 50 && !connected; i++)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        return connected;
     }
 
-    bool disconnectBroker() {
+    bool disconnectBroker() { // TODO
 
         return false;
     }

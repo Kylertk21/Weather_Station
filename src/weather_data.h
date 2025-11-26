@@ -200,14 +200,33 @@ class MQTTServerClient : MQTTClientBase {
         if (!isConnected()) {
             try {
                 connectBroker("server-client");
+                cout << "Connected to broker" << std::endl;
+                return true;
             } catch (...) {
                 cerr << "Failed to connect to broker!" << std::endl;
                 return false;
             }
-            }
-        subscribe("device1/responses");
+        }
+
+        try {
+            subscribe(topic);
+            cout << "Subscribed to "<< topic << std::endl;
+            return true;
+        } catch (...) {
+            cerr << "Failed to subscribe to " << topic << std::endl;
+            return false;
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        publish("device1/requests", "[SERVER] request update");
+
+        try {
+            publish("device1/requests", payload);
+            cout << "Published message to " << topic << " with payload: " << payload << endl;
+            return true;
+        } catch (...) {
+            cerr << "Failed to publish to " << topic << " with payload: " << payload << endl;
+            return false;
+        }
+
         waitForMessage();
 
     }

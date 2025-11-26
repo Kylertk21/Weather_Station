@@ -10,8 +10,14 @@
 
 
 
-class MQTTGatewayClient : public MQTTClientBase {
+class MQTTGatewayClient final : public MQTTClientBase {
+    static mosquitto *mqttClient;
+    static std::atomic<bool> brokerConnected;
+    static std::string lastReceivedMessage;
+    static std::atomic<bool> messageReady;
+    static std::atomic<bool> messageReceived;
 
+public:
     MQTTGatewayClient(const char* name)
         : MQTTClientBase(name) {}
 
@@ -31,5 +37,6 @@ class MQTTGatewayClient : public MQTTClientBase {
             );
         return MOSQ_ERR_SUCCESS;
     }
+
 };
 #endif //WEATHER_STATION_TESTS_H
